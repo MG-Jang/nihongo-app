@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>가나 암기</title>
+<link rel="stylesheet" href="style.css">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="theme-color" content="#3b6ef5">
+<script>if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js");</script>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <a class="back" href="index.html">← 목록</a>
+      <h1>가나 암기</h1>
+    </div>
+    <div class="score" id="score">0 / 0 · 정확도 —</div>
+  </header>
+
+  <div class="filters" id="filters"></div>
+
+  <div class="filters">
+    <button class="chip" id="hard-mode" aria-pressed="false">어려운 단계</button>
+    <button class="chip" id="weak-only" aria-pressed="false">약한 글자만</button>
+    <button class="chip" id="picker-toggle">글자 고르기</button>
+  </div>
+
+  <div class="picker" id="picker" hidden>
+    <div id="picker-groups"></div>
+    <div class="picker-foot">
+      <button class="mini" id="add-misses">틀린 글자 전부 추가</button>
+      <button class="mini" id="clear-weak">전체 해제</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="kana jp" id="kana">…</div>
+    <div class="tag" id="tag">—</div>
+  </div>
+
+  <div class="choices" id="choices"></div>
+  <div class="feedback" id="feedback"></div>
+  <div class="hint">숫자키 <b>1~5</b>로 선택 · <b>Space</b>로 다음 문제 · 틀린 글자를 누르면 약한 글자로 등록됩니다</div>
+
+  <div class="review">
+    <h2>틀린 글자</h2>
+    <div class="misses" id="misses"><span class="empty">아직 없어요.</span></div>
+  </div>
+</div>
+
+<script>
+const KANA = [
+  // 청음
+  ...[["あ","a","아"],["い","i","이"],["う","u","우"],["え","e","에"],["お","o","오"],
+      ["か","ka","카"],["き","ki","키"],["く","ku","쿠"],["け","ke","케"],["こ","ko","코"],
+      ["さ","sa","사"],["し","shi","시"],["す","su","스"],["せ","se","세"],["そ","so","소"],
+      ["た","ta","타"],["ち","chi","치"],["つ","tsu","츠"],["て","te","테"],["と","to","토"],
+      ["な","na","나"],["に","ni","니"],["ぬ","nu","누"],["ね","ne","네"],["の","no","노"],
+      ["は","ha","하"],["ひ","hi","히"],["ふ","fu","후"],["へ","he","헤"],["ほ","ho","호"],
+      ["ま","ma","마"],["み","mi","미"],["む","mu","무"],["め","me","메"],["も","mo","모"],
+      ["や","ya","야"],["ゆ","yu","유"],["よ","yo","요"],
+      ["ら","ra","라"],["り","ri","리"],["る","ru","루"],["れ","re","레"],["ろ","ro","로"],
+      ["わ","wa","와"],["を","wo","오"],["ん","n","응"]].map(x => mk(x, "청음")),
+  // 탁음
+  ...[["が","ga","가"],["ぎ","gi","기"],["ぐ","gu","구"],["げ","ge","게"],["ご","go","고"],
+      ["ざ","za","자"],["じ","ji","지"],["ず","zu","즈"],["ぜ","ze","제"],["ぞ","zo","조"],
+      ["だ","da","다"],["ぢ","ji","지"],["づ","zu","즈"],["で","de","데"],["ど","do","도"],
+      ["ば","ba","바"],["び","bi","비"],["ぶ","bu","부"],["べ","be","베"],["ぼ","bo","보"]].map(x => mk(x, "탁음")),
+  // 반탁음
+  ...[["ぱ","pa","파"],["ぴ","pi","피"],["ぷ","pu","푸"],["ぺ","pe","페"],["ぽ","po","포"]].map(x => mk(x, "반탁음")),
+  // 요음
+  ...[["きゃ","kya","캬"],["きゅ","kyu","큐"],["きょ","kyo","쿄"],
+      ["しゃ","sha","샤"],["しゅ","shu","슈"],["しょ","sho","쇼"],
+      ["ちゃ","cha","차"],["ちゅ","chu","추"],["ちょ","cho","초"],
+      ["にゃ","nya","냐"],["にゅ","nyu","뉴"],["にょ","nyo","뇨"],
+      ["ひゃ","hya","햐"],["ひゅ","hyu","휴"],["ひょ","hyo","효"],
+      ["みゃ","mya","먀"],["みゅ","myu","뮤"],["みょ","myo","묘"],
+      ["りゃ","rya","랴"],["りゅ","ryu","류"],["りょ","ryo","료"],
+      ["ぎゃ","gya","갸"],["ぎゅ","gyu","규"],["ぎょ","gyo","교"],
+      ["じゃ","ja","자"],["じゅ","ju","주"],["じょ","jo","조"],
+      ["びゃ","bya","뱌"],["びゅ","byu","뷰"],["びょ","byo","뵤"],
+      ["ぴゃ","pya","퍄"],["ぴゅ","pyu","퓨"],["ぴょ","pyo","표"]].map(x => mk(x, "요음")),
+];
+
+// 자음 행(row)과 모음(vowel)을 로마자에서 뽑아둔다. 헷갈리는 보기를 고르는 데 쓴다.
+function mk([kana, romaji, ko], type) {
+  const vowel = romaji === "n" ? "n" : romaji.slice(-1);
+  const row = romaji === "n" ? "n" : (romaji.replace(/[aiueo]+$/, "") || "vowel");
+  return { kana, romaji, ko, type, row, vowel };
+}
+
+const TYPES = ["청음", "탁음", "반탁음", "요음"];
+const enabled = new Set(TYPES);
+
+// 어려운 단계 — 요음·탁음·반탁음 전부에, 자주 헷갈리는 청음 14자(라행 + け·は·ひ·ふ·き·う·て·ち·さ)를 더한 범위
+const HARD_EXTRA = new Set(["ら", "り", "る", "れ", "ろ", "け", "は", "ひ", "ふ", "き", "う", "て", "ち", "さ"]);
+let hardMode = false;
+try { hardMode = localStorage.getItem("kanaLevel") === "hard"; } catch {}
+
+// 약한 글자 — 사용자가 직접 고른 집중 연습 대상. 새로고침해도 남도록 저장한다.
+const WEAK_KEY = "weakKana";
+const weak = new Set(loadWeak());
+let weakOnly = false;
+
+// 저장된 값은 남의 손을 탄 데이터로 취급한다. 배열이 아니거나 표에 없는 글자가 들어와도
+// new Set(...)에서 터지거나 "약한 글자만"이 텅 빈 채로 켜지지 않도록 여기서 걸러낸다.
+function loadWeak() {
+  const known = new Set(KANA.map(k => k.kana));
+  try {
+    const raw = JSON.parse(localStorage.getItem(WEAK_KEY));
+    return Array.isArray(raw) ? raw.filter(x => known.has(x)) : [];
+  } catch {
+    return [];   // 사생활 보호 모드 등에서 접근이 막혀도 퀴즈는 돌아가야 한다
+  }
+}
+function saveWeak() {
+  try { localStorage.setItem(WEAK_KEY, JSON.stringify([...weak])); }
+  catch { /* 저장 못 해도 이번 세션 동안은 동작한다 */ }
+}
+
+let current = null;
+let locked = false;
+let advanceTimer = null;   // 자동으로 다음 문제로 넘기는 타이머 (next()에서 반드시 취소한다)
+let total = 0, hits = 0;
+const misses = new Map(); // kana -> {entry, count}
+
+const $ = id => document.getElementById(id);
+const shuffle = a => a.map(v => [Math.random(), v]).sort((x, y) => x[0] - y[0]).map(x => x[1]);
+
+function buildFilters() {
+  $("filters").innerHTML = "";
+  for (const t of TYPES) {
+    const b = document.createElement("button");
+    b.className = "chip";
+    b.textContent = t;
+    b.setAttribute("aria-pressed", enabled.has(t));
+    b.onclick = () => {
+      if (enabled.has(t)) {
+        if (enabled.size === 1) return; // 최소 한 종류는 켜둔다
+        enabled.delete(t);
+      } else {
+        enabled.add(t);
+      }
+      b.setAttribute("aria-pressed", enabled.has(t));
+      next();
+    };
+    $("filters").appendChild(b);
+  }
+}
+
+function pool() {
+  let base;
+  if (weakOnly)       base = KANA.filter(k => weak.has(k.kana));
+  else if (hardMode)  base = KANA.filter(k => k.type !== "청음" || HARD_EXTRA.has(k.kana));
+  else                base = KANA.filter(k => enabled.has(k.type));
+  return base.length ? base : KANA;   // 어떤 경우에도 빈 출제 범위로 떨어지지 않게
+}
+
+function makeChoices(answer) {
+  // 같은 한글 발음(じ/ぢ, ず/づ, お/を 등)은 보기에서 제외 — 정답이 둘이 되면 안 된다
+  const seen = new Set([answer.ko]);
+  const uniq = [];
+  for (const k of KANA) {
+    if (seen.has(k.ko)) continue;
+    seen.add(k.ko);
+    uniq.push(k);
+  }
+  const similar = shuffle(uniq.filter(k => k.row === answer.row || k.vowel === answer.vowel));
+  const rest = shuffle(uniq.filter(k => !similar.includes(k)));
+  const picked = [...similar.slice(0, 3), ...rest].slice(0, 4);
+  return shuffle([answer, ...picked]);
+}
+
+function next() {
+  clearTimeout(advanceTimer);   // 이전 문제의 타이머가 살아 있으면 다음 문제를 곧장 넘겨버린다
+  const p = pool();
+  current = p[Math.floor(Math.random() * p.length)];
+  locked = false;
+  $("kana").textContent = current.kana;
+  $("tag").textContent = current.type;
+  $("feedback").innerHTML = "";
+
+  const box = $("choices");
+  box.innerHTML = "";
+  makeChoices(current).forEach((c, i) => {
+    const b = document.createElement("button");
+    b.className = "choice";
+    b.innerHTML = `<span class="num">${i + 1}</span><span>${c.ko}</span><span class="romaji">${c.romaji}</span>`;
+    b.onclick = () => answer(c, b);
+    b.dataset.ko = c.ko;
+    box.appendChild(b);
+  });
+}
+
+function answer(choice, btn) {
+  if (locked) return;
+  locked = true;
+  total++;
+
+  const correct = choice.ko === current.ko;
+  if (correct) hits++;
+  else {
+    const m = misses.get(current.kana) || { entry: current, count: 0 };
+    m.count++;
+    misses.set(current.kana, m);
+  }
+
+  for (const b of $("choices").children) {
+    b.disabled = true;
+    if (b.dataset.ko === current.ko) b.classList.add("correct");
+    else if (b === btn) b.classList.add("wrong");
+    else b.classList.add("dim");
+  }
+
+  $("feedback").innerHTML = correct
+    ? `<span class="hit">정답!</span> ${current.kana} = ${current.ko} (${current.romaji})`
+    : `<span class="miss">아쉬워요.</span> ${current.kana} = ${current.ko} (${current.romaji})`;
+
+  renderScore();
+  refresh();
+  advanceTimer = setTimeout(() => { if (locked) next(); }, correct ? 700 : 1600);
+}
+
+function renderScore() {
+  const acc = total ? Math.round((hits / total) * 100) + "%" : "—";
+  $("score").innerHTML = `<b>${hits}</b> / ${total} · 정확도 <b>${acc}</b>`;
+}
+
+function renderMisses() {
+  const box = $("misses");
+  if (!misses.size) { box.innerHTML = '<span class="empty">아직 없어요.</span>'; return; }
+  box.innerHTML = "";
+  for (const { entry, count } of [...misses.values()].sort((a, b) => b.count - a.count)) {
+    // 틀린 글자를 눌러 바로 약한 글자로 등록/해제할 수 있게 한다
+    const el = document.createElement("button");
+    el.className = "miss-item";
+    el.title = "눌러서 약한 글자로 등록";
+    el.setAttribute("aria-pressed", weak.has(entry.kana));
+    el.innerHTML = `<span class="k jp">${entry.kana}</span><span class="r">${entry.ko}</span>` +
+      (count > 1 ? `<span class="c">×${count}</span>` : "") + `<span class="star">★</span>`;
+    el.onclick = () => {
+      if (weak.has(entry.kana)) weak.delete(entry.kana); else weak.add(entry.kana);
+      saveWeak();
+      refresh();
+    };
+    box.appendChild(el);
+  }
+}
+
+/* ── 약한 글자 고르기 ───────────────────── */
+/*
+ * 오십음도 배치. 행(가로)과 단(세로)을 맞춰야 눈으로 훑기 쉬우므로 순서를 코드로 유도하지 않고
+ * 표 그대로 적어 둔다. null 은 실제로 없는 칸(や행의 い·え 등)이고, 그 자리는 빈칸으로 비워 정렬을 지킨다.
+ * 요음은 단이 ゃ·ゅ·ょ 셋뿐이라 열을 따로 잡는다.
+ */
+const PICKER_LAYOUT = [
+  { type: "청음", cols: ["あ", "い", "う", "え", "お"], rows: [
+    ["あ", ["あ", "い", "う", "え", "お"]],
+    ["か", ["か", "き", "く", "け", "こ"]],
+    ["さ", ["さ", "し", "す", "せ", "そ"]],
+    ["た", ["た", "ち", "つ", "て", "と"]],
+    ["な", ["な", "に", "ぬ", "ね", "の"]],
+    ["は", ["は", "ひ", "ふ", "へ", "ほ"]],
+    ["ま", ["ま", "み", "む", "め", "も"]],
+    ["や", ["や", null, "ゆ", null, "よ"]],
+    ["ら", ["ら", "り", "る", "れ", "ろ"]],
+    ["わ", ["わ", null, null, null, "を"]],
+    ["ん", ["ん", null, null, null, null]],
+  ]},
+  { type: "탁음", cols: ["あ", "い", "う", "え", "お"], rows: [
+    ["が", ["が", "ぎ", "ぐ", "げ", "ご"]],
+    ["ざ", ["ざ", "じ", "ず", "ぜ", "ぞ"]],
+    ["だ", ["だ", "ぢ", "づ", "で", "ど"]],
+    ["ば", ["ば", "び", "ぶ", "べ", "ぼ"]],
+  ]},
+  { type: "반탁음", cols: ["あ", "い", "う", "え", "お"], rows: [
+    ["ぱ", ["ぱ", "ぴ", "ぷ", "ぺ", "ぽ"]],
+  ]},
+  { type: "요음", cols: ["ゃ", "ゅ", "ょ"], rows: [
+    ["き", ["きゃ", "きゅ", "きょ"]],
+    ["し", ["しゃ", "しゅ", "しょ"]],
+    ["ち", ["ちゃ", "ちゅ", "ちょ"]],
+    ["に", ["にゃ", "にゅ", "にょ"]],
+    ["ひ", ["ひゃ", "ひゅ", "ひょ"]],
+    ["み", ["みゃ", "みゅ", "みょ"]],
+    ["り", ["りゃ", "りゅ", "りょ"]],
+    ["ぎ", ["ぎゃ", "ぎゅ", "ぎょ"]],
+    ["じ", ["じゃ", "じゅ", "じょ"]],
+    ["び", ["びゃ", "びゅ", "びょ"]],
+    ["ぴ", ["ぴゃ", "ぴゅ", "ぴょ"]],
+  ]},
+];
+
+const BY_KANA = new Map(KANA.map(k => [k.kana, k]));
+
+function buildPicker() {
+  const host = $("picker-groups");
+  host.innerHTML = "";
+
+  const cellDiv = (cls, text) => {
+    const el = document.createElement("div");
+    el.className = cls;
+    el.textContent = text;
+    return el;
+  };
+
+  for (const { type, cols, rows } of PICKER_LAYOUT) {
+    const group = document.createElement("div");
+    group.className = "picker-group";
+    const h = document.createElement("h3");
+    h.textContent = type;
+    group.appendChild(h);
+
+    const table = document.createElement("div");
+    table.className = "gyo-table";
+    table.style.gridTemplateColumns = "26px repeat(" + cols.length + ", 1fr)";
+
+    table.appendChild(cellDiv("col-head", ""));                 // 행 이름 열의 머리 — 비워 둔다
+    for (const c of cols) table.appendChild(cellDiv("col-head", c));
+
+    for (const [label, kanas] of rows) {
+      table.appendChild(cellDiv("gyo-label jp", label));
+      for (const kana of kanas) {
+        if (!kana) { table.appendChild(cellDiv("gap", "")); continue; }
+        const k = BY_KANA.get(kana);
+        const cell = document.createElement("button");
+        cell.className = "kana-cell";
+        cell.setAttribute("aria-pressed", weak.has(k.kana));
+        cell.innerHTML = '<span class="k jp"></span><span class="r"></span>';
+        cell.children[0].textContent = k.kana;
+        cell.children[1].textContent = k.ko;
+        cell.onclick = () => {
+          if (weak.has(k.kana)) weak.delete(k.kana); else weak.add(k.kana);
+          saveWeak();
+          refresh();
+        };
+        table.appendChild(cell);
+      }
+    }
+    group.appendChild(table);
+    host.appendChild(group);
+  }
+}
+
+/*
+ * weak / weakOnly / misses 를 비추는 UI는 세 군데(칩, 고르기 패널, 틀린 글자 목록)에 흩어져 있다.
+ * 상태를 바꾼 곳마다 필요한 것만 골라 갱신하면 반드시 한 군데가 어긋나므로,
+ * 바꾼 뒤에는 예외 없이 refresh() 하나만 부른다.
+ */
+function refresh() {
+  if (weakOnly && !weak.size) weakOnly = false;   // 다 지우면 자동으로 전체 출제로 돌아간다
+
+  const chip = $("weak-only");
+  chip.textContent = weak.size ? "약한 글자만 (" + weak.size + ")" : "약한 글자만";
+  chip.disabled = !weak.size;
+  chip.setAttribute("aria-pressed", weakOnly);
+  $("hard-mode").setAttribute("aria-pressed", hardMode);
+
+  const lockTypes = weakOnly || hardMode;         // 두 모드 모두 종류 필터를 무시한다
+  for (const b of $("filters").children) {
+    b.disabled = lockTypes;
+    b.style.opacity = lockTypes ? .4 : 1;
+  }
+  $("add-misses").disabled = !misses.size;
+
+  for (const cell of $("picker-groups").querySelectorAll(".kana-cell")) {
+    cell.setAttribute("aria-pressed", weak.has(cell.children[0].textContent));
+  }
+  renderMisses();
+}
+
+// 두 모드는 출제 범위를 서로 다르게 정의하므로 동시에 켤 수 없다 — 켜는 쪽이 이긴다
+$("hard-mode").onclick = () => {
+  hardMode = !hardMode;
+  if (hardMode) weakOnly = false;
+  try { localStorage.setItem("kanaLevel", hardMode ? "hard" : "all"); } catch {}
+  refresh();
+  next();
+};
+
+$("weak-only").onclick = () => {
+  if (!weak.size) return;
+  weakOnly = !weakOnly;
+  if (weakOnly && hardMode) {
+    hardMode = false;
+    try { localStorage.setItem("kanaLevel", "all"); } catch {}
+  }
+  refresh();
+  next();
+};
+
+$("picker-toggle").onclick = () => {
+  const p = $("picker");
+  p.hidden = !p.hidden;
+  $("picker-toggle").textContent = p.hidden ? "글자 고르기" : "고르기 닫기";
+  if (p.hidden) next();   // 고르기를 끝내고 닫을 때 새 범위로 문제를 다시 낸다
+};
+
+$("add-misses").onclick = () => {
+  for (const kana of misses.keys()) weak.add(kana);
+  saveWeak();
+  refresh();
+};
+
+$("clear-weak").onclick = () => {
+  weak.clear();
+  saveWeak();
+  refresh();
+  next();
+};
+
+document.addEventListener("keydown", e => {
+  // 고르기 패널이 열려 있거나 버튼에 포커스가 있으면 단축키가 그쪽 조작을 가로채면 안 된다
+  if (!$("picker").hidden) return;
+  if (e.target.closest && e.target.closest(".kana-cell, .chip, .miss-item, .mini")) return;
+
+  if (e.key >= "1" && e.key <= "5") {
+    const b = $("choices").children[+e.key - 1];
+    if (b && !b.disabled) b.click();
+  } else if (e.code === "Space") {
+    e.preventDefault();
+    next();
+  }
+});
+
+buildFilters();
+buildPicker();
+refresh();
+renderScore();
+next();
+</script>
+</body>
+</html>

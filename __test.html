@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<meta charset="UTF-8">
+<title>kana.html 회귀 테스트</title>
+<pre id="out">running…</pre>
+<script>
+const out = [];
+const say = (name, pass, extra) => out.push((pass ? "PASS  " : "FAIL  ") + name + (extra ? "   [" + extra + "]" : ""));
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+function load(storage) {
+  return new Promise(resolve => {
+    if (storage === null) localStorage.removeItem("weakKana");
+    else localStorage.setItem("weakKana", storage);
+    const f = document.createElement("iframe");
+    f.style.cssText = "width:800px;height:900px";
+    f.src = "kana.html?" + Math.random();
+    f.onload = () => setTimeout(() => resolve(f), 60);
+    document.body.appendChild(f);
+  });
+}
+
+const ctx = f => ({ w: f.contentWindow, d: f.contentDocument });
+
+function pickChoice({ w, d }, wantCorrect) {
+  const ko = w.eval("current.ko");
+  const btns = [...d.querySelectorAll(".choice")];
+  const b = wantCorrect ? btns.find(x => x.dataset.ko === ko) : btns.find(x => x.dataset.ko !== ko);
+  b.click();
+  return b;
+}
+
+(async () => {
+  /* ── 1. 오답 직후 "틀린 글자 전부 추가"가 살아나는가 (refresh 누락 버그) ── */
+  {
+    const f = await load(null), c = ctx(f);
+    const before = c.d.getElementById("add-misses").disabled;
+    pickChoice(c, false);
+    await sleep(40);
+    const after = c.d.getElementById("add-misses").disabled;
+    say("오답 1개 → '틀린 글자 전부 추가' 활성화", before === true && after === false,
+        "before=" + before + " after=" + after);
+
+    /* ── 2. 고르기 패널에서 별을 켜면 틀린 글자 목록의 별도 같이 켜지는가 ── */
+    const kana = c.w.eval("[...misses.keys()][0]");
+    const cell = [...c.d.querySelectorAll(".kana-cell")].find(x => x.children[0].textContent === kana);
+    cell.click();
+    await sleep(40);
+    const item = [...c.d.querySelectorAll(".miss-item")].find(x => x.children[0].textContent === kana);
+    say("패널에서 별 등록 → 틀린 글자 목록 별도 동기화",
+        item && item.getAttribute("aria-pressed") === "true",
+        "kana=" + kana + " pressed=" + (item && item.getAttribute("aria-pressed")));
+
+    /* ── 3. 같은 항목을 다시 누르면 해제되는가 (상태가 어긋나면 여기서 티가 난다) ── */
+    item.click();
+    await sleep(40);
+    // refresh()가 목록을 다시 그리므로 참조를 새로 잡아야 한다 (앞의 item은 이미 떨어져 나간 노드)
+    const item2 = [...c.d.querySelectorAll(".miss-item")].find(x => x.children[0].textContent === kana);
+    say("다시 누르면 해제", c.w.eval("weak.size") === 0 && item2.getAttribute("aria-pressed") === "false",
+        "weak.size=" + c.w.eval("weak.size") + " pressed=" + item2.getAttribute("aria-pressed"));
+
+    /* ── 4. 약한 글자만 모드에서 출제 범위가 실제로 좁혀지는가 ── */
+    cell.click();
+    await sleep(30);
+    c.d.getElementById("weak-only").click();
+    await sleep(30);
+    const poolSize = c.w.eval("pool().length");
+    const poolIsWeak = c.w.eval("pool().every(k => weak.has(k.kana))");
+    say("약한 글자만 → 출제 범위가 고른 글자로 제한", poolSize === 1 && poolIsWeak,
+        "pool=" + poolSize);
+    say("약한 글자만 → 종류 필터 비활성", c.d.querySelector("#filters .chip").disabled === true);
+
+    /* ── 5. 전체 해제하면 모드가 자동으로 꺼지고 전체 범위로 복귀 ── */
+    c.d.getElementById("clear-weak").click();
+    await sleep(30);
+    say("전체 해제 → 모드 자동 해제, 전체 출제 복귀",
+        c.w.eval("weakOnly") === false && c.w.eval("pool().length") === 104,
+        "pool=" + c.w.eval("pool().length"));
+    f.remove();
+  }
+
+  /* ── 6. 이전 문제의 타이머가 다음 문제를 앞당겨 넘기지 않는가 ── */
+  {
+    const f = await load(null), c = ctx(f);
+    pickChoice(c, true);            // 정답 → 700ms 뒤 자동 넘김 예약
+    await sleep(30);
+    c.w.eval("next()");             // 사용자가 스페이스로 먼저 넘김 → 예약은 취소돼야 한다
+    await sleep(30);
+    pickChoice(c, false);           // 오답 → 1600ms 동안 해설이 떠 있어야 한다
+    const shown = c.w.eval("current.kana");
+    await sleep(1000);              // 취소가 안 됐다면 이 사이(700ms 지점)에 넘어가 버린다
+    say("이전 문제 타이머가 다음 문제를 앞당겨 넘기지 않음",
+        c.w.eval("current.kana") === shown, "shown=" + shown + " now=" + c.w.eval("current.kana"));
+    f.remove();
+  }
+
+  /* ── 7. 저장값이 깨져 있어도 페이지가 살아 있는가 ── */
+  for (const [label, raw, expect] of [
+    ["객체가 저장돼 있어도 죽지 않음", "{}", 0],
+    ["표에 없는 글자는 걸러냄", '["ル","ロ"]', 0],
+    ["JSON이 아니어도 죽지 않음", "not json", 0],
+    ["정상 값은 그대로 복원", '["る","ろ"]', 2],
+  ]) {
+    const f = await load(raw), c = ctx(f);
+    const alive = c.d.querySelectorAll(".choice").length === 5;
+    const size = c.w.eval("typeof weak === 'undefined' ? -1 : weak.size");
+    say(label, alive && size === expect, "choices=" + c.d.querySelectorAll(".choice").length + " weak=" + size);
+    f.remove();
+  }
+
+  /* ── 8. 패널이 열려 있을 때 스페이스가 퀴즈를 넘겨버리지 않는가 ── */
+  {
+    const f = await load('["る"]'), c = ctx(f);
+    c.d.getElementById("picker-toggle").click();
+    await sleep(30);
+    const before = c.w.eval("current.kana");
+    const cell = c.d.querySelector(".kana-cell");
+    cell.focus();
+    cell.dispatchEvent(new c.w.KeyboardEvent("keydown", { code: "Space", key: " ", bubbles: true }));
+    await sleep(40);
+    say("패널이 열려 있을 때 스페이스가 문제를 넘기지 않음", c.w.eval("current.kana") === before,
+        "before=" + before + " after=" + c.w.eval("current.kana"));
+    f.remove();
+  }
+
+  /* ── 8b. 어려운 단계 ── */
+  {
+    localStorage.removeItem("kanaLevel");
+    const f = await load(null), c = ctx(f);
+    c.d.getElementById("hard-mode").click();
+    await sleep(30);
+    const size = c.w.eval("pool().length");
+    const comp = c.w.eval("pool().every(k => k.type !== '청음' || HARD_EXTRA.has(k.kana))");
+    const hasRu = c.w.eval("pool().some(k => k.kana === 'る')");
+    const hasA = c.w.eval("pool().some(k => k.kana === 'あ')");
+    say("어려운 단계 → 요음·탁음·반탁음 + 지정 청음 14자 (72자)",
+        size === 72 && comp && hasRu && !hasA, "pool=" + size);
+    say("어려운 단계 → 종류 필터 잠김", c.d.querySelector("#filters .chip").disabled === true);
+    say("어려운 단계 설정 저장", localStorage.getItem("kanaLevel") === "hard");
+
+    // 약한 글자만과는 동시에 켤 수 없다
+    c.d.querySelector(".kana-cell").click();
+    await sleep(20);
+    c.d.getElementById("weak-only").click();
+    await sleep(20);
+    say("약한 글자만을 켜면 어려운 단계는 꺼짐",
+        c.w.eval("hardMode") === false && c.w.eval("weakOnly") === true &&
+        localStorage.getItem("kanaLevel") === "all");
+    f.remove();
+    localStorage.removeItem("kanaLevel");
+  }
+
+  /* ── 9. 오십음도 표가 104자를 하나도 빠뜨리지 않는가 ── */
+  {
+    const f = await load(null), c = ctx(f);
+    const cells = [...c.d.querySelectorAll(".kana-cell")].map(x => x.children[0].textContent);
+    const table = c.w.eval("KANA.map(k => k.kana)");
+    const missing = table.filter(k => !cells.includes(k));
+    const extra = cells.filter(k => !table.includes(k));
+    say("오십음도 표에 104자가 전부 있고 중복이 없음",
+        cells.length === 104 && !missing.length && !extra.length && new Set(cells).size === 104,
+        "cells=" + cells.length + " missing=" + missing.join(",") + " extra=" + extra.join(","));
+
+    // 열 정렬이 깨지면 표로 만든 의미가 없다 — 청음 표는 (행이름+5단) × (머리글+11행) 칸이어야 한다
+    const seion = c.d.querySelector(".gyo-table");
+    say("청음 표가 6열 × 12줄로 정렬됨", seion.children.length === 72,
+        "children=" + seion.children.length);
+    f.remove();
+  }
+
+  /* ── 10. 1장 출제 순서 ── */
+  {
+    const f = document.createElement("iframe");
+    f.style.cssText = "width:800px;height:900px";
+    f.src = "chapter.html?ch=1";
+    await new Promise(r => { f.onload = () => setTimeout(r, 60); document.body.appendChild(f); });
+    const c = ctx(f);
+
+    c.d.getElementById("order-seq").click();
+    await sleep(30);
+    const ids = c.w.eval("queue.map(x => x.id).slice(1)");
+    const ascending = ids.every((v, i) => i === 0 || ids[i - 1] < v);
+    say("교재 순서 → 남은 문제가 원본 차례대로", ascending && ids.length === 23,
+        "n=" + ids.length + " head=" + ids.slice(0, 5).join(","));
+    say("교재 순서 → 칩 상태 반영",
+        c.d.getElementById("order-seq").getAttribute("aria-pressed") === "true" &&
+        c.d.getElementById("order-shuffle").getAttribute("aria-pressed") === "false");
+
+    const cur = c.w.eval("current.id");
+    c.d.getElementById("order-shuffle").click();
+    await sleep(30);
+    say("순서를 바꿔도 풀고 있던 문제는 그대로", c.w.eval("current.id") === cur,
+        "before=" + cur + " after=" + c.w.eval("current.id"));
+    say("설정이 저장됨", localStorage.getItem("chapterOrder") === "shuffle",
+        String(localStorage.getItem("chapterOrder")));
+    f.remove();
+  }
+
+  /* ── 11. 단어 설명 ── */
+  {
+    localStorage.setItem("chapterOrder", "seq");
+    localStorage.setItem("showParts", "0");
+    const f = document.createElement("iframe");
+    f.style.cssText = "width:800px;height:900px";
+    f.src = "chapter.html?ch=1";
+    await new Promise(r => { f.onload = () => setTimeout(r, 60); document.body.appendChild(f); });
+    const c = ctx(f);
+
+    // 교재 순서 1번 = お仕事は何ですか。 — 분해가 5조각이어야 한다
+    say("첫 문제가 교재 1번", c.w.eval("current.ko") === "직업이 무엇입니까?", c.w.eval("current.ko"));
+    say("끄면 문제 푸는 중엔 안 보임", c.d.getElementById("parts").hidden === true);
+
+    c.d.getElementById("parts-toggle").click();
+    await sleep(30);
+    const rows = [...c.d.querySelectorAll(".part")].map(r => r.children[0].textContent);
+    say("켜면 단어별로 끊어서 보임", c.d.getElementById("parts").hidden === false && rows.length === 5,
+        rows.join(" | "));
+    say("조사 は의 읽기를 わ로 안내",
+        [...c.d.querySelectorAll(".part")].some(r => r.children[0].textContent === "は" && r.children[1].textContent === "わ"));
+
+    // 꺼도 정답을 맞힌 뒤에는 보여야 한다
+    c.d.getElementById("parts-toggle").click();
+    await sleep(20);
+    say("다시 끄면 숨김", c.d.getElementById("parts").hidden === true);
+    const ko = c.w.eval("current.ko");
+    [...c.d.querySelectorAll(".choice")].find(b => b.dataset.ko === ko).click();
+    await sleep(40);
+    say("답한 뒤에는 꺼져 있어도 해설로 보임", c.d.getElementById("parts").hidden === false);
+
+    // 분해가 없는 단어(私)에서는 빈 상자가 뜨지 않아야 한다
+    const noParts = c.w.eval("ITEMS.filter(x => !x.parts).length");
+    // 私·あなた·彼 는 더 쪼갤 것이 없어 분해가 없다 — 이때 빈 상자가 뜨면 안 된다
+    say("분해가 없는 항목(私·あなた·彼)은 3개", noParts === 3, "n=" + noParts);
+    f.remove();
+    localStorage.removeItem("chapterOrder");
+    localStorage.removeItem("showParts");
+  }
+
+  const failed = out.filter(l => l.startsWith("FAIL")).length;
+  document.getElementById("out").textContent =
+    out.join("\n") + "\n\n" + (out.length - failed) + "/" + out.length + " 통과";
+})().catch(e => {
+  document.getElementById("out").textContent = out.join("\n") + "\n\nERROR " + e.message + "\n" + e.stack;
+});
+</script>
