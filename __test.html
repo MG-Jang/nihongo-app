@@ -149,6 +149,75 @@ function pickChoice({ w, d }, wantCorrect) {
     localStorage.removeItem("kanaLevel");
   }
 
+  /* ── 8c. 어려운 단계 스테이지 시스템 ── */
+  {
+    localStorage.removeItem("kanaLevel");
+    localStorage.removeItem("hardStages");
+    localStorage.removeItem("slowKana");
+    const f = await load(null), c = ctx(f);
+    c.d.getElementById("hard-mode").click();
+    await sleep(40);
+
+    const sizes = c.w.eval("hs.split.map(s => s.length).join(',')");
+    const uniq = c.w.eval("new Set(hs.split.flat()).size");
+    say("어려운 단계 → 72자를 24자씩 3단계로 무작위 분할", sizes === "24,24,24" && uniq === 72,
+        sizes + " uniq=" + uniq);
+    say("1단계 자동 선택, 진행 표시", c.w.eval("stage") === 0 &&
+        c.d.getElementById("tag").textContent.includes("1단계 · 1/24"),
+        c.d.getElementById("tag").textContent);
+    say("5초 타이머 표시", c.d.getElementById("timebar").hidden === false);
+
+    // 오답 → 최고 단계 목록에 저장
+    pickChoice(c, false);
+    await sleep(40);
+    say("오답 → 최고 단계 목록에 저장", c.w.eval("slow.has(current.kana)") === true &&
+        JSON.parse(localStorage.getItem("slowKana")).length === 1);
+
+    // 목록에 있는 글자를 1~3단계에서 5초 내 정답 → 제거
+    c.w.eval("next()");
+    await sleep(30);
+    c.w.eval("slow.add(current.kana); saveSlow();");
+    pickChoice(c, true);
+    await sleep(40);
+    say("1~3단계에서 5초 내 정답 → 목록에서 제거", c.w.eval("slow.has(current.kana)") === false);
+
+    // 남은 문제를 전부 밀어 1단계 완료
+    for (let i = 0; i < 30 && c.w.eval("stage === 0 && stagePos < stageQueue.length"); i++) {
+      if (!c.w.eval("locked")) { pickChoice(c, true); await sleep(15); }
+      c.w.eval("clearTimeout(advanceTimer); if (locked) { locked = false; next(); }");
+      await sleep(10);
+    }
+    say("1단계 완료 → 완료 저장 + 완료 카드",
+        c.w.eval("hs.done[0]") === true &&
+        JSON.parse(localStorage.getItem("hardStages")).done[0] === true &&
+        c.d.getElementById("tag").textContent.includes("1단계 완료"),
+        c.d.getElementById("tag").textContent);
+
+    // 껐다 켜도 분할·진행이 유지되고 2단계부터 이어진다
+    const savedSplit = c.w.eval("JSON.stringify(hs.split)");
+    f.remove();
+    const f2 = await load(null), c2 = ctx(f2);
+    say("껐다 켜면 같은 분할로 2단계부터 이어서",
+        c2.w.eval("JSON.stringify(hs.split)") === savedSplit &&
+        c2.w.eval("hs.done[0]") === true && c2.w.eval("stage") === 1,
+        "stage=" + c2.w.eval("stage"));
+
+    // 최고 단계 — 저장된 글자만 나오고, 맞혀도 목록은 유지된다
+    const topBtn = [...c2.d.querySelectorAll("#stage-bar .stage")].find(b => b.dataset.stage === "top");
+    say("최고 단계 칩에 저장 개수 표시", topBtn.textContent.includes("(1)"), topBtn.textContent);
+    topBtn.click();
+    await sleep(40);
+    say("최고 단계 → 저장된 글자만 출제",
+        c2.w.eval("stageQueue.length") === 1 && c2.w.eval("slow.has(current.kana)") === true);
+    pickChoice(c2, true);
+    await sleep(40);
+    say("최고 단계에서 맞혀도 목록 유지 (졸업은 1~3단계에서만)", c2.w.eval("slow.size") === 1);
+    f2.remove();
+    localStorage.removeItem("kanaLevel");
+    localStorage.removeItem("hardStages");
+    localStorage.removeItem("slowKana");
+  }
+
   /* ── 9. 오십음도 표가 104자를 하나도 빠뜨리지 않는가 ── */
   {
     const f = await load(null), c = ctx(f);

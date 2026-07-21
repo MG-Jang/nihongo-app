@@ -28,6 +28,14 @@
     <button class="chip" id="picker-toggle">글자 고르기</button>
   </div>
 
+  <div class="filters" id="stage-bar" hidden>
+    <button class="chip stage" data-stage="0">1단계</button>
+    <button class="chip stage" data-stage="1">2단계</button>
+    <button class="chip stage" data-stage="2">3단계</button>
+    <button class="chip stage" data-stage="top">최고 단계</button>
+    <button class="mini" id="reshuffle" hidden>새로 섞기</button>
+  </div>
+
   <div class="picker" id="picker" hidden>
     <div id="picker-groups"></div>
     <div class="picker-foot">
@@ -38,6 +46,7 @@
 
   <div class="card">
     <div class="kana jp" id="kana">…</div>
+    <div class="timebar" id="timebar" hidden><div class="fill" id="timefill"></div></div>
     <div class="tag" id="tag">—</div>
   </div>
 
@@ -95,40 +104,81 @@ function mk([kana, romaji, ko], type) {
 const TYPES = ["청음", "탁음", "반탁음", "요음"];
 const enabled = new Set(TYPES);
 
+const $ = id => document.getElementById(id);
+const shuffle = a => a.map(v => [Math.random(), v]).sort((x, y) => x[0] - y[0]).map(x => x[1]);
+
 // 어려운 단계 — 요음·탁음·반탁음 전부에, 자주 헷갈리는 청음 14자(라행 + け·は·ひ·ふ·き·う·て·ち·さ)를 더한 범위
 const HARD_EXTRA = new Set(["ら", "り", "る", "れ", "ろ", "け", "は", "ひ", "ふ", "き", "う", "て", "ち", "さ"]);
+const hardPool = () => KANA.filter(k => k.type !== "청음" || HARD_EXTRA.has(k.kana));
 let hardMode = false;
 try { hardMode = localStorage.getItem("kanaLevel") === "hard"; } catch {}
 
-// 약한 글자 — 사용자가 직접 고른 집중 연습 대상. 새로고침해도 남도록 저장한다.
-const WEAK_KEY = "weakKana";
-const weak = new Set(loadWeak());
-let weakOnly = false;
+/*
+ * 어려운 단계는 72자를 무작위로 24자씩 1·2·3단계로 나눠 진행한다.
+ * 분할과 단계 완료 여부를 저장해 두므로, 1단계만 끝내고 앱을 껐다가 나중에 이어서 할 수 있다.
+ * 문제마다 5초 제한이 있고, 5초 안에 정답을 고르지 못한 글자는 slow 목록에 쌓인다.
+ * "최고 단계"는 그 목록만 출제하며, 목록에서 빠지는 길은 1~3단계에서 5초 내 정답뿐이다.
+ */
+const HS_KEY = "hardStages";
+const SLOW_KEY = "slowKana";
+const SEC_LIMIT = 5000;
+
+function makeSplit() {
+  const p = shuffle(hardPool().map(k => k.kana));
+  return { split: [p.slice(0, 24), p.slice(24, 48), p.slice(48, 72)], done: [false, false, false] };
+}
+
+function loadStages() {
+  // 저장된 분할이 현재 출제 범위와 정확히 같은 72자일 때만 신뢰한다 (범위를 고치면 자동으로 새로 섞임)
+  const want = hardPool().map(k => k.kana).sort().join("");
+  try {
+    const v = JSON.parse(localStorage.getItem(HS_KEY));
+    if (v && Array.isArray(v.split) && v.split.length === 3 && Array.isArray(v.done) &&
+        v.split.every(s => Array.isArray(s)) && v.split.flat().sort().join("") === want)
+      return { split: v.split, done: [0, 1, 2].map(i => !!v.done[i]) };
+  } catch {}
+  return makeSplit();
+}
+
+let hs = loadStages();
+function saveStages() { try { localStorage.setItem(HS_KEY, JSON.stringify(hs)); } catch {} }
+saveStages();   // 새로 섞였다면 바로 고정해 둔다 — 중간에 껐다 켜도 같은 분할이어야 하므로
+
+let stage = null;       // 0·1·2 또는 "top", 어려운 단계가 꺼져 있으면 null
+let stageQueue = [];    // 이번 단계에서 낼 글자들 (한 글자씩 한 번만)
+let stagePos = 0;
+let runFast = 0, runTotal = 0;   // 이번 단계 런의 5초 내 정답 통계
 
 // 저장된 값은 남의 손을 탄 데이터로 취급한다. 배열이 아니거나 표에 없는 글자가 들어와도
-// new Set(...)에서 터지거나 "약한 글자만"이 텅 빈 채로 켜지지 않도록 여기서 걸러낸다.
-function loadWeak() {
+// new Set(...)에서 터지거나 빈 목록으로 모드가 켜지지 않도록 여기서 걸러낸다.
+function loadKanaList(key) {
   const known = new Set(KANA.map(k => k.kana));
   try {
-    const raw = JSON.parse(localStorage.getItem(WEAK_KEY));
+    const raw = JSON.parse(localStorage.getItem(key));
     return Array.isArray(raw) ? raw.filter(x => known.has(x)) : [];
   } catch {
     return [];   // 사생활 보호 모드 등에서 접근이 막혀도 퀴즈는 돌아가야 한다
   }
 }
+
+// 약한 글자 — 사용자가 직접 고른 집중 연습 대상. 새로고침해도 남도록 저장한다.
+const WEAK_KEY = "weakKana";
+const weak = new Set(loadKanaList(WEAK_KEY));
+let weakOnly = false;
 function saveWeak() {
   try { localStorage.setItem(WEAK_KEY, JSON.stringify([...weak])); }
   catch { /* 저장 못 해도 이번 세션 동안은 동작한다 */ }
 }
+
+// 5초 안에 정답을 못 고른 글자들 — "최고 단계"의 출제 범위
+const slow = new Set(loadKanaList(SLOW_KEY));
+function saveSlow() { try { localStorage.setItem(SLOW_KEY, JSON.stringify([...slow])); } catch {} }
 
 let current = null;
 let locked = false;
 let advanceTimer = null;   // 자동으로 다음 문제로 넘기는 타이머 (next()에서 반드시 취소한다)
 let total = 0, hits = 0;
 const misses = new Map(); // kana -> {entry, count}
-
-const $ = id => document.getElementById(id);
-const shuffle = a => a.map(v => [Math.random(), v]).sort((x, y) => x[0] - y[0]).map(x => x[1]);
 
 function buildFilters() {
   $("filters").innerHTML = "";
@@ -174,15 +224,35 @@ function makeChoices(answer) {
   return shuffle([answer, ...picked]);
 }
 
-function next() {
-  clearTimeout(advanceTimer);   // 이전 문제의 타이머가 살아 있으면 다음 문제를 곧장 넘겨버린다
-  const p = pool();
-  current = p[Math.floor(Math.random() * p.length)];
-  locked = false;
-  $("kana").textContent = current.kana;
-  $("tag").textContent = current.type;
-  $("feedback").innerHTML = "";
+/* ── 5초 타이머 ─────────────────────────── */
+let qStart = 0, overTimer = null;
 
+function startTimer() {
+  const bar = $("timebar"), fill = $("timefill");
+  bar.hidden = false;
+  bar.classList.remove("over");
+  fill.style.transition = "none";
+  fill.style.width = "100%";
+  void fill.offsetWidth;                       // 강제 리플로 — 없으면 전환이 생략된다
+  fill.style.transition = "width " + SEC_LIMIT + "ms linear";
+  fill.style.width = "0%";
+  qStart = Date.now();
+  clearTimeout(overTimer);
+  overTimer = setTimeout(() => bar.classList.add("over"), SEC_LIMIT);
+}
+
+function stopTimer(freeze) {
+  clearTimeout(overTimer);
+  const bar = $("timebar"), fill = $("timefill");
+  if (freeze && !bar.hidden) {
+    fill.style.width = getComputedStyle(fill).width;   // 답한 순간의 위치에서 멈춘다
+    fill.style.transition = "none";
+  } else if (!freeze) {
+    bar.hidden = true;
+  }
+}
+
+function renderChoices() {
   const box = $("choices");
   box.innerHTML = "";
   makeChoices(current).forEach((c, i) => {
@@ -195,9 +265,77 @@ function next() {
   });
 }
 
+function next() {
+  clearTimeout(advanceTimer);   // 이전 문제의 타이머가 살아 있으면 다음 문제를 곧장 넘겨버린다
+  stopTimer(false);
+  if (hardMode) { nextHard(); return; }
+
+  const p = pool();
+  current = p[Math.floor(Math.random() * p.length)];
+  locked = false;
+  $("kana").textContent = current.kana;
+  $("tag").textContent = current.type;
+  $("feedback").innerHTML = "";
+  renderChoices();
+}
+
+/* ── 어려운 단계 진행 ────────────────────── */
+const stageLabel = () => stage === "top" ? "최고 단계" : (stage + 1) + "단계";
+
+function nextHard() {
+  if (stage === null) {   // 세 단계를 모두 끝낸 채 들어온 상태
+    renderStageDone("모든 단계 완료", "새로 섞기를 누르면 72자를 다시 24자씩 나눠 새 사이클을 시작합니다.");
+    return;
+  }
+  if (stagePos >= stageQueue.length) {
+    if (stage !== "top" && !hs.done[stage]) { hs.done[stage] = true; saveStages(); }
+    renderStageDone(stageLabel() + " 완료",
+      "5초 내 정답 " + runFast + "/" + runTotal + " · 최고 단계 대기 " + slow.size + "자");
+    refresh();
+    return;
+  }
+  current = stageQueue[stagePos];
+  locked = false;
+  $("kana").textContent = current.kana;
+  $("tag").textContent = stageLabel() + " · " + (stagePos + 1) + "/" + stageQueue.length + " · " + current.type;
+  $("feedback").innerHTML = "";
+  renderChoices();
+  startTimer();
+}
+
+function renderStageDone(title, detail) {
+  locked = true;
+  current = null;
+  $("kana").textContent = "✓";
+  $("tag").textContent = title;
+  $("choices").innerHTML = "";
+  $("feedback").textContent = detail;
+  $("timebar").hidden = true;
+}
+
+function selectStage(i) {
+  stage = i;
+  const kanas = i === "top" ? [...slow] : hs.split[i];
+  stageQueue = shuffle(kanas.map(k => BY_KANA.get(k)));
+  stagePos = 0;
+  runFast = 0;
+  runTotal = 0;
+  refresh();
+  next();
+}
+
+// 어려운 단계에 들어오면 아직 안 끝낸 첫 단계부터 이어서 한다
+function enterHard() {
+  const i = hs.done.findIndex(d => !d);
+  if (i === -1) { stage = null; refresh(); next(); }
+  else selectStage(i);
+}
+
 function answer(choice, btn) {
   if (locked) return;
   locked = true;
+  const elapsed = Date.now() - qStart;
+  stopTimer(true);
   total++;
 
   const correct = choice.ko === current.ko;
@@ -208,6 +346,28 @@ function answer(choice, btn) {
     misses.set(current.kana, m);
   }
 
+  // 5초 판정 — 최고 단계는 연습일 뿐, 목록에서 빼주는 건 1~3단계에서 5초 내 정답뿐이다
+  let quick = correct;
+  let extra = "";
+  if (hardMode) {
+    const fast = correct && elapsed <= SEC_LIMIT;
+    const sec = " · " + (elapsed / 1000).toFixed(1) + "초";
+    quick = fast;
+    runTotal++;
+    if (fast) runFast++;
+    if (stage === "top") {
+      extra = sec;
+    } else if (fast) {
+      extra = sec + (slow.has(current.kana) ? " · 최고 단계에서 제거!" : "");
+      if (slow.delete(current.kana)) saveSlow();
+    } else {
+      extra = sec + " · ⏱ 최고 단계에 저장";
+      slow.add(current.kana);
+      saveSlow();
+    }
+    stagePos++;
+  }
+
   for (const b of $("choices").children) {
     b.disabled = true;
     if (b.dataset.ko === current.ko) b.classList.add("correct");
@@ -215,13 +375,13 @@ function answer(choice, btn) {
     else b.classList.add("dim");
   }
 
-  $("feedback").innerHTML = correct
+  $("feedback").innerHTML = (correct
     ? `<span class="hit">정답!</span> ${current.kana} = ${current.ko} (${current.romaji})`
-    : `<span class="miss">아쉬워요.</span> ${current.kana} = ${current.ko} (${current.romaji})`;
+    : `<span class="miss">아쉬워요.</span> ${current.kana} = ${current.ko} (${current.romaji})`) + extra;
 
   renderScore();
   refresh();
-  advanceTimer = setTimeout(() => { if (locked) next(); }, correct ? 700 : 1600);
+  advanceTimer = setTimeout(() => { if (locked) next(); }, quick ? 700 : 1600);
 }
 
 function renderScore() {
@@ -369,7 +529,26 @@ function refresh() {
   for (const cell of $("picker-groups").querySelectorAll(".kana-cell")) {
     cell.setAttribute("aria-pressed", weak.has(cell.children[0].textContent));
   }
+  renderStageBar();
   renderMisses();
+}
+
+function renderStageBar() {
+  const bar = $("stage-bar");
+  bar.hidden = !hardMode;
+  if (!hardMode) return;
+  for (const b of bar.querySelectorAll(".stage")) {
+    const s = b.dataset.stage;
+    if (s === "top") {
+      b.textContent = "최고 단계 (" + slow.size + ")";
+      b.disabled = !slow.size;
+      b.setAttribute("aria-pressed", stage === "top");
+    } else {
+      b.textContent = (+s + 1) + "단계" + (hs.done[+s] ? " ✓" : "");
+      b.setAttribute("aria-pressed", stage === +s);
+    }
+  }
+  $("reshuffle").hidden = !hs.done.every(Boolean);
 }
 
 // 두 모드는 출제 범위를 서로 다르게 정의하므로 동시에 켤 수 없다 — 켜는 쪽이 이긴다
@@ -377,8 +556,20 @@ $("hard-mode").onclick = () => {
   hardMode = !hardMode;
   if (hardMode) weakOnly = false;
   try { localStorage.setItem("kanaLevel", hardMode ? "hard" : "all"); } catch {}
+  if (hardMode) { enterHard(); return; }
+  stage = null;
   refresh();
   next();
+};
+
+for (const b of document.querySelectorAll("#stage-bar .stage")) {
+  b.onclick = () => selectStage(b.dataset.stage === "top" ? "top" : +b.dataset.stage);
+}
+
+$("reshuffle").onclick = () => {
+  hs = makeSplit();
+  saveStages();
+  enterHard();
 };
 
 $("weak-only").onclick = () => {
@@ -386,6 +577,7 @@ $("weak-only").onclick = () => {
   weakOnly = !weakOnly;
   if (weakOnly && hardMode) {
     hardMode = false;
+    stage = null;
     try { localStorage.setItem("kanaLevel", "all"); } catch {}
   }
   refresh();
@@ -422,7 +614,8 @@ document.addEventListener("keydown", e => {
     if (b && !b.disabled) b.click();
   } else if (e.code === "Space") {
     e.preventDefault();
-    next();
+    if (!hardMode) { next(); return; }
+    if (locked) { locked = false; next(); }   // 단계 모드에선 답하기 전엔 건너뛸 수 없다
   }
 });
 
@@ -430,7 +623,7 @@ buildFilters();
 buildPicker();
 refresh();
 renderScore();
-next();
+if (hardMode) enterHard(); else next();
 </script>
 </body>
 </html>
