@@ -18,30 +18,40 @@
 
   <p class="lede">
     문제를 보고 5지선다로 답을 고르는 방식입니다.<br>
-    숫자키 <b>1~5</b>로 답하고, 장별 퀴즈에서는 <b>F</b>로 히라가나를 열어볼 수 있어요.
+    장을 고르면 퀴즈와 듣기 트랙 중에 선택할 수 있어요.
   </p>
 
-  <div class="menu">
+  <div class="menu" id="menu">
     <a class="entry" href="kana.html">
       <div class="t">가나 암기</div>
-      <div class="d">히라가나 · 탁음 · 반탁음 · 요음 104자를 한글 발음으로 맞히기. 종류별로 켜고 끌 수 있습니다.</div>
-    </a>
-
-    <a class="entry" href="chapter.html?ch=1">
-      <div class="t">1장 · 직업과 인칭</div>
-      <div class="d">단어 24개. 1주기는 한자 위에 히라가나를 달아주고, 2주기부터는 한자만 나옵니다.</div>
-    </a>
-
-    <a class="entry" href="listen.html?ch=1">
-      <div class="t">1장 · 듣기</div>
-      <div class="d">일본어를 읽어주고 이어서 한국어 뜻을 말해줍니다. 반복 재생과 속도 조절 지원.</div>
-    </a>
-
-    <a class="entry soon" href="chapter.html?ch=2">
-      <div class="t">2장</div>
-      <div class="d">아직 단어를 넣지 않았습니다.</div>
+      <div class="d">히라가나 · 탁음 · 반탁음 · 요음 104자를 한글 발음으로 맞히기. 어려운 단계는 24자씩 3단계 + 최고 단계.</div>
     </a>
   </div>
 </div>
+
+<script src="chapters.js"></script>
+<script>
+// 장 목록은 chapters.js에서 만들어 낸다 — 새 장을 추가하면 여기 목록도 자동으로 늘어난다
+const menu = document.getElementById("menu");
+const nums = Object.keys(CHAPTERS).map(Number).sort((a, b) => a - b);
+
+for (const n of nums) {
+  const ch = CHAPTERS[n];
+  const a = document.createElement("a");
+  a.className = "entry";
+  a.href = "ch.html?ch=" + n;
+  a.innerHTML = '<div class="t"></div><div class="d"></div>';
+  a.children[0].textContent = ch.title + " · " + ch.subtitle;
+  a.children[1].textContent = "단어 " + ch.items.length + "개 · 퀴즈와 듣기 트랙";
+  menu.appendChild(a);
+}
+
+// 다음 장 자리 표시 — chapters.js에 데이터가 들어오면 자동으로 진짜 항목이 된다
+const soon = document.createElement("a");
+soon.className = "entry soon";
+soon.innerHTML = '<div class="t"></div><div class="d">아직 단어를 넣지 않았습니다.</div>';
+soon.children[0].textContent = (nums[nums.length - 1] + 1) + "장";
+menu.appendChild(soon);
+</script>
 </body>
 </html>

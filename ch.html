@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>장 선택</title>
+<link rel="stylesheet" href="style.css">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="theme-color" content="#3b6ef5">
+<script>if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js");</script>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <a class="back" href="index.html">← 목록</a>
+      <h1 id="title">…</h1>
+    </div>
+  </header>
+
+  <p class="lede" id="lede"></p>
+
+  <div class="menu">
+    <a class="entry" id="go-quiz">
+      <div class="t">단어 퀴즈</div>
+      <div class="d">5지선다. 1주기는 한자 위에 히라가나, 2주기부터는 한자만. 훔쳐본 글자는 맞힐 때까지 반복됩니다.</div>
+    </a>
+    <a class="entry" id="go-listen">
+      <div class="t">듣기 트랙</div>
+      <div class="d">일본어를 읽어주고 이어서 한국어 뜻을 말해줍니다. 반복 재생과 속도 조절 지원.</div>
+    </a>
+  </div>
+</div>
+
+<script src="chapters.js"></script>
+<script>
+const chNo = new URLSearchParams(location.search).get("ch") || "1";
+const chapter = CHAPTERS[chNo];
+if (!chapter) {
+  document.body.innerHTML = '<div class="wrap"><p class="lede">' + chNo + '장 데이터가 없습니다. <a href="index.html">목록으로</a></p></div>';
+  throw new Error("no chapter " + chNo);
+}
+document.title = chapter.title + " · " + chapter.subtitle;
+document.getElementById("title").textContent = chapter.title + " · " + chapter.subtitle;
+document.getElementById("lede").textContent = "단어 " + chapter.items.length + "개. 퀴즈로 외우거나 듣기로 반복하세요.";
+document.getElementById("go-quiz").href = "chapter.html?ch=" + chNo;
+document.getElementById("go-listen").href = "listen.html?ch=" + chNo;
+</script>
+</body>
+</html>

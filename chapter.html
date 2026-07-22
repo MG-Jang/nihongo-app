@@ -14,7 +14,7 @@
 <div class="wrap">
   <header>
     <div>
-      <a class="back" href="index.html">← 목록</a>
+      <a class="back" href="index.html" id="back">← 목록</a>
       <h1 id="title">…</h1>
     </div>
     <div class="score" id="score">0 / 0</div>
@@ -70,6 +70,8 @@ if (!chapter) {
 }
 document.title = chapter.title + " · 단어 퀴즈";
 $("title").textContent = chapter.title + " · " + chapter.subtitle;
+$("back").href = "ch.html?ch=" + chNo;
+$("back").textContent = "← " + chapter.title;
 
 // 한자가 없는 항목(조사, あなた 등)은 후리가나 개념이 없다 — 버튼을 잠근다
 const ITEMS = chapter.items.map((it, i) => ({

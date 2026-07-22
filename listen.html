@@ -14,7 +14,7 @@
 <div class="wrap">
   <header>
     <div>
-      <a class="back" href="index.html">← 목록</a>
+      <a class="back" href="index.html" id="back">← 목록</a>
       <h1 id="title">…</h1>
     </div>
     <div class="score" id="pos">—</div>
@@ -44,6 +44,8 @@ if (!chapter) {
 }
 document.title = chapter.title + " · 듣기";
 $("title").textContent = chapter.title + " 듣기 · " + chapter.subtitle;
+$("back").href = "ch.html?ch=" + chNo;
+$("back").textContent = "← " + chapter.title;
 
 const ITEMS = chapter.items.map((it, i) => ({
   ...it,

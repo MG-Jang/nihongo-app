@@ -304,6 +304,40 @@ function pickChoice({ w, d }, wantCorrect) {
     localStorage.removeItem("showParts");
   }
 
+  /* ── 11b. 목록 → 장 허브 내비게이션 ── */
+  {
+    const mk = src => new Promise(res => {
+      const f = document.createElement("iframe");
+      f.style.cssText = "width:800px;height:600px";
+      f.src = src;
+      f.onload = () => setTimeout(() => res(f), 60);
+      document.body.appendChild(f);
+    });
+
+    const fi = await mk("index.html");
+    const links = [...fi.contentDocument.querySelectorAll("#menu .entry")].map(a => a.getAttribute("href"));
+    const soonT = fi.contentDocument.querySelector(".entry.soon .t").textContent;
+    say("목록에 장 항목이 chapters.js에서 자동 생성", links.includes("ch.html?ch=1"), links.join(" "));
+    say("다음 장 자리 표시(2장)", soonT === "2장", soonT);
+    fi.remove();
+
+    const fh = await mk("ch.html?ch=1");
+    const q = fh.contentDocument.getElementById("go-quiz").getAttribute("href");
+    const l = fh.contentDocument.getElementById("go-listen").getAttribute("href");
+    say("허브에서 퀴즈/듣기로 분기", q === "chapter.html?ch=1" && l === "listen.html?ch=1", q + " " + l);
+    fh.remove();
+
+    const fq = await mk("chapter.html?ch=1");
+    say("퀴즈의 뒤로 가기 → 1장 허브",
+        fq.contentDocument.getElementById("back").getAttribute("href") === "ch.html?ch=1");
+    fq.remove();
+
+    const fl = await mk("listen.html?ch=1");
+    say("듣기의 뒤로 가기 → 1장 허브",
+        fl.contentDocument.getElementById("back").getAttribute("href") === "ch.html?ch=1");
+    fl.remove();
+  }
+
   /* ── 12. 1장 듣기 ── */
   {
     const f = document.createElement("iframe");
