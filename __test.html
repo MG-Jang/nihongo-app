@@ -317,9 +317,20 @@ function pickChoice({ w, d }, wantCorrect) {
     const fi = await mk("index.html");
     const links = [...fi.contentDocument.querySelectorAll("#menu .entry")].map(a => a.getAttribute("href"));
     const soonT = fi.contentDocument.querySelector(".entry.soon .t").textContent;
-    say("목록에 장 항목이 chapters.js에서 자동 생성", links.includes("ch.html?ch=1"), links.join(" "));
-    say("다음 장 자리 표시(2장)", soonT === "2장", soonT);
+    say("목록에 장 항목이 chapters.js에서 자동 생성",
+        links.includes("ch.html?ch=1") && links.includes("ch.html?ch=2"), links.join(" "));
+    say("다음 장 자리 표시(3장)", soonT === "3장", soonT);
     fi.remove();
+
+    // 2장 — 항목 수와 보기 중복 여부 (뜻이 겹치면 5지선다 정답이 둘이 된다)
+    const f2 = await mk("chapter.html?ch=2");
+    const n2 = f2.contentWindow.eval("ITEMS.length");
+    const u2 = f2.contentWindow.eval("new Set(ITEMS.map(x => x.ko)).size");
+    say("2장 퀴즈 30항목, 뜻 중복 없음", n2 === 30 && u2 === 30, n2 + "/" + u2);
+    f2.remove();
+    const fl2 = await mk("listen.html?ch=2");
+    say("2장 듣기 30트랙", fl2.contentDocument.querySelectorAll(".track").length === 30);
+    fl2.remove();
 
     const fh = await mk("ch.html?ch=1");
     const q = fh.contentDocument.getElementById("go-quiz").getAttribute("href");
