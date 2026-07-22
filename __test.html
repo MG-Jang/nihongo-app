@@ -304,6 +304,38 @@ function pickChoice({ w, d }, wantCorrect) {
     localStorage.removeItem("showParts");
   }
 
+  /* ── 12. 1장 듣기 ── */
+  {
+    const f = document.createElement("iframe");
+    f.style.cssText = "width:800px;height:900px";
+    f.src = "listen.html?ch=1";
+    await new Promise(r => { f.onload = () => setTimeout(r, 60); document.body.appendChild(f); });
+    const c = ctx(f);
+
+    say("듣기 목록에 24항목", c.d.querySelectorAll(".track").length === 24,
+        "n=" + c.d.querySelectorAll(".track").length);
+
+    // 진짜 TTS 대신 호출을 기록하는 가짜 엔진을 꽂아 재생 순서를 검증한다
+    c.w.eval("window.__calls = []; synth = { speak: function(u){ __calls.push(u.lang + ':' + u.text); setTimeout(function(){ if (u.onend) u.onend(); }, 5); }, cancel: function(){}, getVoices: function(){ return []; } };");
+    c.d.getElementById("play").click();
+    await sleep(600);   // 1항목: ja → 450ms → ko 까지는 충분히 지난 시점
+    const calls = c.w.eval("__calls.slice(0, 2)");
+    say("일본어(요미가나) → 한국어 뜻 순서로 재생",
+        calls[0] === "ja-JP:おしごとはなんですか。" && calls[1] === "ko-KR:직업이 무엇입니까?",
+        calls.join(" | "));
+    say("재생 중 현재 항목 강조", c.d.querySelector(".track.now") !== null);
+
+    c.d.getElementById("stop").click();
+    await sleep(20);
+    say("정지 → 처음으로", c.w.eval("playing") === false && c.w.eval("idx") === 0);
+
+    // 조사는 표기가 아니라 발음으로 읽어야 한다
+    say("조사 ～は→'わ', ～を→'お'로 읽음",
+        c.w.eval("jaText(ITEMS[17])") === "わ" && c.w.eval("jaText(ITEMS[21])") === "お",
+        c.w.eval("jaText(ITEMS[17])") + "/" + c.w.eval("jaText(ITEMS[21])"));
+    f.remove();
+  }
+
   const failed = out.filter(l => l.startsWith("FAIL")).length;
   document.getElementById("out").textContent =
     out.join("\n") + "\n\n" + (out.length - failed) + "/" + out.length + " 통과";

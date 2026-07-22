@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>듣기</title>
+<link rel="stylesheet" href="style.css">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="theme-color" content="#3b6ef5">
+<script>if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js");</script>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <a class="back" href="index.html">← 목록</a>
+      <h1 id="title">…</h1>
+    </div>
+    <div class="score" id="pos">—</div>
+  </header>
+
+  <div class="filters">
+    <button class="chip" id="play">▶ 재생</button>
+    <button class="chip" id="stop">⏹ 처음부터</button>
+    <button class="chip" id="loop" aria-pressed="false">반복</button>
+    <button class="chip" id="rate">속도 1.0×</button>
+  </div>
+
+  <p class="lede" id="notice" hidden></p>
+
+  <div class="tracklist" id="list"></div>
+</div>
+
+<script src="chapters.js"></script>
+<script>
+const $ = id => document.getElementById(id);
+
+const chNo = new URLSearchParams(location.search).get("ch") || "1";
+const chapter = CHAPTERS[chNo];
+if (!chapter) {
+  document.body.innerHTML = '<div class="wrap"><p class="lede">' + chNo + '장 데이터가 없습니다. <a href="index.html">목록으로</a></p></div>';
+  throw new Error("no chapter " + chNo);
+}
+document.title = chapter.title + " · 듣기";
+$("title").textContent = chapter.title + " 듣기 · " + chapter.subtitle;
+
+const ITEMS = chapter.items.map((it, i) => ({
+  ...it,
+  id: i,
+  surface: it.seg.map(s => s[0]).join(""),
+  reading: it.seg.map(([t, r]) => r || t).join(""),
+}));
+
+/*
+ * TTS에 넣을 문자열. 한자 대신 요미가나를 읽혀서 오독을 막는다.
+ * ～ 같은 기호는 지우고, 표기와 발음이 다른 조사(は→わ, を→お)는
+ * chapters.js의 tts 필드가 대신한다. 한국어의 "/"는 쉼으로 바꾼다.
+ */
+const jaText = it => (it.tts || it.reading).replace(/[～~]/g, "");
+const koText = it => it.ko.replace(/[～~]/g, "").replace(/\//g, ", ");
+
+let synth = window.speechSynthesis;
+let idx = 0;
+let playing = false;
+let stepTimer = null;
+let rate = 1.0;
+let loop = false;
+let seq = 0;   // 정지·점프 뒤 늦게 도착하는 onend 콜백을 무시하기 위한 세대 번호
+
+function speak(text, lang, done) {
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang = lang;
+  u.rate = rate;
+  const v = synth.getVoices().find(v => (v.lang || "").toLowerCase().startsWith(lang.slice(0, 2)));
+  if (v) u.voice = v;
+  u.onend = done;
+  u.onerror = done;   // 음성이 없어서 실패해도 다음 항목으로는 넘어간다
+  synth.speak(u);
+}
+
+function playItem() {
+  if (!playing) return;
+  const my = ++seq;
+  const it = ITEMS[idx];
+  render();
+  speak(jaText(it), "ja-JP", () => {
+    if (!playing || my !== seq) return;
+    stepTimer = setTimeout(() => {
+      speak(koText(it), "ko-KR", () => {
+        if (!playing || my !== seq) return;
+        stepTimer = setTimeout(() => {
+          if (!playing || my !== seq) return;
+          if (idx + 1 < ITEMS.length) { idx++; playItem(); }
+          else if (loop) { idx = 0; playItem(); }
+          else { playing = false; idx = 0; render(); }
+        }, 900);
+      });
+    }, 450);
+  });
+}
+
+function jumpTo(i) {
+  clearTimeout(stepTimer);
+  synth.cancel();
+  idx = i;
+  playing = true;
+  warnIfNoJa();
+  playItem();
+}
+
+$("play").onclick = () => {
+  if (playing) {
+    // 일시정지 — pause()/resume()은 안드로이드에서 불안정해서, 재개하면 현재 항목을 처음부터 다시 읽는다
+    playing = false;
+    clearTimeout(stepTimer);
+    synth.cancel();
+    render();
+  } else {
+    playing = true;
+    warnIfNoJa();
+    playItem();
+  }
+};
+
+$("stop").onclick = () => {
+  playing = false;
+  clearTimeout(stepTimer);
+  synth.cancel();
+  idx = 0;
+  render();
+};
+
+$("loop").onclick = () => {
+  loop = !loop;
+  $("loop").setAttribute("aria-pressed", loop);
+};
+
+const RATES = [1.0, 0.8, 0.6];
+$("rate").onclick = () => {
+  rate = RATES[(RATES.indexOf(rate) + 1) % RATES.length];
+  $("rate").textContent = "속도 " + rate.toFixed(1) + "×";
+};
+
+function warnIfNoJa() {
+  const vs = synth.getVoices();
+  if (vs.length && !vs.some(v => (v.lang || "").toLowerCase().startsWith("ja"))) {
+    $("notice").hidden = false;
+    $("notice").textContent =
+      "일본어 음성이 설치되어 있지 않은 것 같습니다. 휴대폰 설정의 텍스트 음성 변환(TTS)에서 " +
+      "Google TTS 일본어 음성을 설치하면 들립니다.";
+  }
+}
+
+function buildList() {
+  const box = $("list");
+  for (const it of ITEMS) {
+    const row = document.createElement("button");
+    row.className = "track";
+    row.innerHTML = '<span class="num"></span><span class="body"><span class="ja jp"></span>' +
+      '<span class="rd jp"></span></span><span class="ko"></span>';
+    row.children[0].textContent = it.id + 1;
+    row.children[1].children[0].textContent = it.surface;
+    row.children[1].children[1].textContent = it.reading !== it.surface ? it.reading : "";
+    row.children[2].textContent = it.ko;
+    row.onclick = () => jumpTo(it.id);
+    box.appendChild(row);
+  }
+}
+
+function render() {
+  $("pos").textContent = (idx + 1) + " / " + ITEMS.length;
+  $("play").textContent = playing ? "⏸ 일시정지" : "▶ 재생";
+  const rows = $("list").children;
+  for (let i = 0; i < rows.length; i++) rows[i].classList.toggle("now", i === idx);
+  if (rows[idx]) rows[idx].scrollIntoView({ block: "nearest", behavior: "smooth" });
+}
+
+// 일부 브라우저는 음성 목록을 늦게 채운다 — 채워지는 시점에 경고 여부를 다시 판단
+if (synth && synth.onvoiceschanged !== undefined) {
+  synth.onvoiceschanged = () => { if (playing) warnIfNoJa(); };
+}
+
+buildList();
+render();
+</script>
+</body>
+</html>
