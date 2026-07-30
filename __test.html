@@ -370,11 +370,19 @@ function pickChoice({ w, d }, wantCorrect) {
     const rows = [...cw.d.querySelectorAll(".item")];
     say("1장 단어 목록 22개 (문장 2개 제외)", rows.length === 22, "n=" + rows.length);
 
-    // 첫 항목(会社員)이 일본어 → 읽는 법 → 뜻 → 한글 발음 순서로 표시되는지
-    const cols = [...rows[0].querySelector(".col").children].map(x => x.textContent);
-    say("표시 순서: 일본어 · 읽는 법 · 뜻 · 한글 발음",
-        cols[0] === "会社員" && cols[1] === "かいしゃいん" &&
-        cols[2] === "회사원" && cols[3] === "카이샤인", cols.join(" | "));
+    // 첫 항목(会社員)이 일본어 → 읽는 법 → (뜻 + 한글 발음) 순서로 표시되는지
+    const cols = [...rows[0].querySelector(".col").children].map(x => x.className);
+    const txt = ["ja", "read", "mean", "pron"].map(c => rows[0].querySelector("." + c).textContent);
+    say("표시 순서: 일본어 · 읽는 법 · (뜻+발음 한 줄)",
+        cols.join(",") === "ja jp,read jp,kr" &&
+        txt.join("|") === "会社員|かいしゃいん|회사원|카이샤인", cols.join(",") + " / " + txt.join("|"));
+
+    // 뜻과 발음이 실제로 같은 줄에 놓였는지 (세로 위치가 같아야 한다)
+    const mBox = rows[0].querySelector(".mean").getBoundingClientRect();
+    const pBox = rows[0].querySelector(".pron").getBoundingClientRect();
+    say("뜻과 한글 발음이 한 줄에 나란히",
+        Math.abs(mBox.top - pBox.top) < 6 && pBox.left > mBox.right - 2,
+        "mean.top=" + Math.round(mBox.top) + " pron.top=" + Math.round(pBox.top));
 
     // 가나만으로 된 단어는 읽는 법 줄을 비워 중복 표시를 피한다
     const ana = rows.find(r => r.querySelector(".ja").textContent === "あなた");

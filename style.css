@@ -495,13 +495,16 @@ rt.off { visibility: hidden; }
 .item .ja { font-size: 19px; font-weight: 700; line-height: 1.35; word-break: keep-all; }
 .item .read { font-size: 13px; color: var(--muted); line-height: 1.35; }
 .item .read:empty { display: none; }
+/* 뜻과 한글 발음은 한 줄에 나란히. 길면 줄바꿈되되 가운뎃점은 따라 내려가지 않는다. */
+.item .kr { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; }
 .item .mean { font-size: 14px; line-height: 1.4; }
 .item .pron {
   font-size: 13px;
   font-weight: 600;
   color: var(--accent);
-  line-height: 1.35;
+  line-height: 1.4;
 }
+.item .pron:not(:empty)::before { content: "· "; color: var(--muted); font-weight: 400; }
 .item .say { margin-left: auto; flex: none; font-size: 13px; opacity: .45; }
 .item:hover .say { opacity: 1; }
 

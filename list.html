@@ -90,8 +90,7 @@ function render() {
       '<span class="col">' +
         '<span class="ja jp"></span>' +
         '<span class="read jp"></span>' +
-        '<span class="mean"></span>' +
-        '<span class="pron"></span>' +
+        '<span class="kr"><span class="mean"></span><span class="pron"></span></span>' +
       '</span>' +
       '<span class="say">🔊</span>';
     el.children[0].textContent = it.no;
@@ -99,8 +98,8 @@ function render() {
     col.children[0].textContent = it.surface;
     // 표기와 읽는 법이 같으면(가나만으로 된 단어) 같은 줄을 두 번 보여줄 필요가 없다
     col.children[1].textContent = it.reading === it.surface ? "" : it.reading;
-    col.children[2].textContent = it.ko;
-    col.children[3].textContent = it.pron || "";
+    col.children[2].children[0].textContent = it.ko;
+    col.children[2].children[1].textContent = it.pron || "";
     el.onclick = () => speak(it);
     box.appendChild(el);
   }
