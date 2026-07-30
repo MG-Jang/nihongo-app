@@ -42,7 +42,7 @@ for (const n of nums) {
   a.href = "ch.html?ch=" + n;
   a.innerHTML = '<div class="t"></div><div class="d"></div>';
   a.children[0].textContent = ch.title + " · " + ch.subtitle;
-  a.children[1].textContent = "단어 " + ch.items.length + "개 · 퀴즈와 듣기 트랙";
+  a.children[1].textContent = ch.items.length + "개 항목 · 퀴즈 · 듣기 · 단어/문장 목록";
   menu.appendChild(a);
 }
 

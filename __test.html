@@ -335,7 +335,12 @@ function pickChoice({ w, d }, wantCorrect) {
     const fh = await mk("ch.html?ch=1");
     const q = fh.contentDocument.getElementById("go-quiz").getAttribute("href");
     const l = fh.contentDocument.getElementById("go-listen").getAttribute("href");
-    say("허브에서 퀴즈/듣기로 분기", q === "chapter.html?ch=1" && l === "listen.html?ch=1", q + " " + l);
+    const w = fh.contentDocument.getElementById("go-words").getAttribute("href");
+    const s = fh.contentDocument.getElementById("go-sentences").getAttribute("href");
+    say("허브에서 퀴즈/듣기/단어목록/문장목록으로 분기",
+        q === "chapter.html?ch=1" && l === "listen.html?ch=1" &&
+        w === "list.html?ch=1&kind=word" && s === "list.html?ch=1&kind=sentence",
+        [q, l, w, s].join(" "));
     fh.remove();
 
     const fq = await mk("chapter.html?ch=1");
@@ -347,6 +352,59 @@ function pickChoice({ w, d }, wantCorrect) {
     say("듣기의 뒤로 가기 → 1장 허브",
         fl.contentDocument.getElementById("back").getAttribute("href") === "ch.html?ch=1");
     fl.remove();
+  }
+
+  /* ── 11c. 단어 목록 / 문장 목록 ── */
+  {
+    const mk = src => new Promise(res => {
+      const f = document.createElement("iframe");
+      f.style.cssText = "width:800px;height:900px";
+      f.src = src;
+      f.onload = () => setTimeout(() => res(f), 60);
+      document.body.appendChild(f);
+    });
+
+    const fw = await mk("list.html?ch=1&kind=word");
+    const cw = ctx(fw);
+    const rows = [...cw.d.querySelectorAll(".item")];
+    say("1장 단어 목록 22개 (문장 2개 제외)", rows.length === 22, "n=" + rows.length);
+
+    // 첫 항목(会社員)이 일본어 → 읽는 법 → 뜻 → 한글 발음 순서로 표시되는지
+    const cols = [...rows[0].querySelector(".col").children].map(x => x.textContent);
+    say("표시 순서: 일본어 · 읽는 법 · 뜻 · 한글 발음",
+        cols[0] === "会社員" && cols[1] === "かいしゃいん" &&
+        cols[2] === "회사원" && cols[3] === "카이샤인", cols.join(" | "));
+
+    // 가나만으로 된 단어는 읽는 법 줄을 비워 중복 표시를 피한다
+    const ana = rows.find(r => r.querySelector(".ja").textContent === "あなた");
+    say("가나 단어는 읽는 법 줄 생략", ana.querySelector(".read").textContent === "");
+
+    // 조사는 ～ 를 떼고 읽는 법을 보여준다
+    const wa = rows.find(r => r.querySelector(".ja").textContent === "～は");
+    say("조사 ～は → 읽는 법 は, 한글 발음 와",
+        wa.querySelector(".read").textContent === "は" && wa.querySelector(".pron").textContent === "와");
+
+    // 모든 항목에 한글 발음이 채워져 있어야 한다
+    const missing = cw.w.eval("ITEMS.filter(x => !x.pron).length");
+    say("1장 모든 항목에 한글 발음 있음", missing === 0, "빈 항목=" + missing);
+
+    // 탭 전환
+    cw.d.getElementById("tab-sentence").click();
+    await sleep(30);
+    const sRows = [...cw.d.querySelectorAll(".item .ja")].map(x => x.textContent);
+    say("문장 탭 → 문장 2개만", sRows.length === 2 && sRows[0] === "お仕事は何ですか。", sRows.join(" | "));
+    say("탭 전환이 주소에 반영", location.href.indexOf("kind=") === -1, "부모 주소는 그대로");
+    fw.remove();
+
+    // 2장도 같은 구조로 자동 동작
+    const f2 = await mk("list.html?ch=2&kind=sentence");
+    const c2 = ctx(f2);
+    say("2장 문장 목록 1개 (何ですか)",
+        c2.d.querySelectorAll(".item").length === 1 &&
+        c2.d.querySelector(".item .ja").textContent === "何ですか");
+    const miss2 = c2.w.eval("ITEMS.filter(x => !x.pron).length");
+    say("2장 모든 항목에 한글 발음 있음", miss2 === 0, "빈 항목=" + miss2);
+    f2.remove();
   }
 
   /* ── 12. 1장 듣기 ── */

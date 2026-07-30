@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>목록</title>
+<link rel="stylesheet" href="style.css">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="theme-color" content="#6366f1">
+<script>if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js");</script>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <a class="back" href="index.html" id="back">← 목록</a>
+      <h1 id="title">…</h1>
+    </div>
+    <div class="score" id="count">—</div>
+  </header>
+
+  <div class="filters">
+    <button class="chip" id="tab-word">단어</button>
+    <button class="chip" id="tab-sentence">문장</button>
+  </div>
+
+  <p class="lede">항목을 누르면 일본어를 읽어줍니다.</p>
+
+  <div class="vlist" id="list"></div>
+</div>
+
+<script src="chapters.js"></script>
+<script>
+const $ = id => document.getElementById(id);
+
+const params = new URLSearchParams(location.search);
+const chNo = params.get("ch") || "1";
+const chapter = CHAPTERS[chNo];
+if (!chapter) {
+  document.body.innerHTML = '<div class="wrap"><p class="lede">' + chNo + '장 데이터가 없습니다. <a href="index.html">목록으로</a></p></div>';
+  throw new Error("no chapter " + chNo);
+}
+$("back").href = "ch.html?ch=" + chNo;
+$("back").textContent = "← " + chapter.title;
+
+let kind = params.get("kind") === "sentence" ? "sentence" : "word";
+
+const ITEMS = chapter.items.map((it, i) => ({
+  ...it,
+  no: i + 1,
+  surface: it.seg.map(s => s[0]).join(""),
+  // 읽는 법: read 가 있으면 그것, 없으면 요미가나를 이어 붙인다. 조사의 ～ 는 발음이 아니므로 뗀다.
+  reading: it.read || it.seg.map(([t, r]) => r || t).join("").replace(/[～~]/g, ""),
+  isSentence: it.kind === "s",
+}));
+
+function speak(it) {
+  if (!window.speechSynthesis) return;
+  speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance((it.tts || it.reading).replace(/[～~]/g, ""));
+  u.lang = "ja-JP";
+  const v = speechSynthesis.getVoices().find(v => (v.lang || "").toLowerCase().startsWith("ja"));
+  if (v) u.voice = v;
+  speechSynthesis.speak(u);
+}
+
+function render() {
+  const label = kind === "sentence" ? "문장 목록" : "단어 목록";
+  document.title = chapter.title + " · " + label;
+  $("title").textContent = chapter.title + " · " + label;
+  $("tab-word").setAttribute("aria-pressed", kind === "word");
+  $("tab-sentence").setAttribute("aria-pressed", kind === "sentence");
+
+  const rows = ITEMS.filter(it => it.isSentence === (kind === "sentence"));
+  $("count").textContent = rows.length + "개";
+
+  const box = $("list");
+  box.innerHTML = "";
+  if (!rows.length) {
+    box.innerHTML = '<p class="empty">이 장에는 아직 등록된 문장이 없습니다.</p>';
+    return;
+  }
+
+  for (const it of rows) {
+    const el = document.createElement("button");
+    el.className = "item";
+    el.innerHTML =
+      '<span class="n"></span>' +
+      '<span class="col">' +
+        '<span class="ja jp"></span>' +
+        '<span class="read jp"></span>' +
+        '<span class="mean"></span>' +
+        '<span class="pron"></span>' +
+      '</span>' +
+      '<span class="say">🔊</span>';
+    el.children[0].textContent = it.no;
+    const col = el.children[1];
+    col.children[0].textContent = it.surface;
+    // 표기와 읽는 법이 같으면(가나만으로 된 단어) 같은 줄을 두 번 보여줄 필요가 없다
+    col.children[1].textContent = it.reading === it.surface ? "" : it.reading;
+    col.children[2].textContent = it.ko;
+    col.children[3].textContent = it.pron || "";
+    el.onclick = () => speak(it);
+    box.appendChild(el);
+  }
+}
+
+function setKind(k) {
+  kind = k;
+  // 새로고침이나 공유 링크에서도 같은 탭이 열리도록 주소를 맞춰 둔다
+  history.replaceState(null, "", "list.html?ch=" + chNo + "&kind=" + k);
+  render();
+}
+
+$("tab-word").onclick = () => setKind("word");
+$("tab-sentence").onclick = () => setKind("sentence");
+
+render();
+</script>
+</body>
+</html>

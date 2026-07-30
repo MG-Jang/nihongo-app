@@ -4,7 +4,7 @@
  * 오프라인일 때만 마지막으로 캐시된 사본으로 대신한다.
  * 단어를 자주 고치는 앱이라 캐시 우선으로 하면 낡은 화면이 붙어 다니게 된다.
  */
-const CACHE = "nihongo-v4";
+const CACHE = "nihongo-v5";
 const CORE = [
   "./",
   "index.html",
@@ -12,6 +12,7 @@ const CORE = [
   "ch.html",
   "chapter.html",
   "listen.html",
+  "list.html",
   "style.css",
   "chapters.js",
   "manifest.webmanifest",

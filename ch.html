@@ -30,6 +30,14 @@
       <div class="t">듣기 트랙</div>
       <div class="d">일본어를 읽어주고 이어서 한국어 뜻을 말해줍니다. 반복 재생과 속도 조절 지원.</div>
     </a>
+    <a class="entry" id="go-words">
+      <div class="t">단어 목록</div>
+      <div class="d">일본어 · 읽는 법 · 뜻 · 한글 발음을 한눈에. 항목을 누르면 읽어줍니다.</div>
+    </a>
+    <a class="entry" id="go-sentences">
+      <div class="t">문장 목록</div>
+      <div class="d">이 장에 나오는 문장과 표현을 같은 형식으로 정리했습니다.</div>
+    </a>
   </div>
 </div>
 
@@ -43,9 +51,13 @@ if (!chapter) {
 }
 document.title = chapter.title + " · " + chapter.subtitle;
 document.getElementById("title").textContent = chapter.title + " · " + chapter.subtitle;
-document.getElementById("lede").textContent = "단어 " + chapter.items.length + "개. 퀴즈로 외우거나 듣기로 반복하세요.";
+const nSentence = chapter.items.filter(it => it.kind === "s").length;
+document.getElementById("lede").textContent =
+  "단어 " + (chapter.items.length - nSentence) + "개 · 문장 " + nSentence + "개. 퀴즈로 외우거나 듣기로 반복하세요.";
 document.getElementById("go-quiz").href = "chapter.html?ch=" + chNo;
 document.getElementById("go-listen").href = "listen.html?ch=" + chNo;
+document.getElementById("go-words").href = "list.html?ch=" + chNo + "&kind=word";
+document.getElementById("go-sentences").href = "list.html?ch=" + chNo + "&kind=sentence";
 </script>
 </body>
 </html>

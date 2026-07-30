@@ -140,6 +140,8 @@ h1 {
 }
 #go-quiz::before { content: "✍️"; }
 #go-listen::before { content: "🎧"; }
+#go-words::before { content: "📋"; }
+#go-sentences::before { content: "💬"; }
 .entry:hover { border-color: var(--accent); transform: translateY(-2px); }
 .entry:active { transform: scale(.98); }
 .entry .t { font-size: 16px; font-weight: 700; margin-bottom: 3px; }
@@ -454,6 +456,54 @@ rt.off { visibility: hidden; }
 }
 .btn:active { transform: scale(.96); }
 .btn.ghost { background: transparent; color: var(--accent); border: 1px solid var(--accent); box-shadow: none; }
+
+/* ── 단어·문장 목록 ───────────────────── */
+/* 한 항목이 일본어 → 읽는 법 → 뜻 → 한글 발음 순으로 위에서 아래로 읽힌다 */
+.vlist { display: grid; gap: 9px; }
+.item {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  width: 100%;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 15px;
+  padding: 13px 15px;
+  font-family: inherit;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  transition: transform .12s, border-color .12s, box-shadow .12s;
+}
+.item:hover { border-color: var(--accent); transform: translateY(-1px); box-shadow: var(--shadow); }
+.item:active { transform: scale(.99); }
+.item .n {
+  flex: none;
+  min-width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border-radius: 7px;
+  background: var(--card-2);
+  border: 1px solid var(--border);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.item .col { display: grid; gap: 3px; min-width: 0; }
+.item .ja { font-size: 19px; font-weight: 700; line-height: 1.35; word-break: keep-all; }
+.item .read { font-size: 13px; color: var(--muted); line-height: 1.35; }
+.item .read:empty { display: none; }
+.item .mean { font-size: 14px; line-height: 1.4; }
+.item .pron {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent);
+  line-height: 1.35;
+}
+.item .say { margin-left: auto; flex: none; font-size: 13px; opacity: .45; }
+.item:hover .say { opacity: 1; }
 
 /* ── 듣기 트랙 목록 ───────────────────── */
 .tracklist { display: grid; gap: 9px; }
