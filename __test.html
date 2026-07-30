@@ -318,8 +318,9 @@ function pickChoice({ w, d }, wantCorrect) {
     const links = [...fi.contentDocument.querySelectorAll("#menu .entry")].map(a => a.getAttribute("href"));
     const soonT = fi.contentDocument.querySelector(".entry.soon .t").textContent;
     say("목록에 장 항목이 chapters.js에서 자동 생성",
-        links.includes("ch.html?ch=1") && links.includes("ch.html?ch=2"), links.join(" "));
-    say("다음 장 자리 표시(3장)", soonT === "3장", soonT);
+        links.includes("ch.html?ch=1") && links.includes("ch.html?ch=2") &&
+        links.includes("ch.html?ch=3"), links.join(" "));
+    say("다음 장 자리 표시(4장)", soonT === "4장", soonT);
     fi.remove();
 
     // 2장 — 항목 수와 보기 중복 여부 (뜻이 겹치면 5지선다 정답이 둘이 된다)
@@ -405,6 +406,39 @@ function pickChoice({ w, d }, wantCorrect) {
     const miss2 = c2.w.eval("ITEMS.filter(x => !x.pron).length");
     say("2장 모든 항목에 한글 발음 있음", miss2 === 0, "빈 항목=" + miss2);
     f2.remove();
+
+    // 3장 — 숫자. 읽기가 둘인 글자는 목록에서 둘 다 보여준다
+    const f3 = await mk("list.html?ch=3&kind=word");
+    const c3 = ctx(f3);
+    const r3 = [...c3.d.querySelectorAll(".item")];
+    say("3장 단어 목록 11개 (0~10)", r3.length === 11, "n=" + r3.length);
+    const four = r3.find(r => r.querySelector(".ja").textContent === "四");
+    say("四는 읽는 법 よん／し, 발음 욘／시",
+        four.querySelector(".read").textContent === "よん／し" &&
+        four.querySelector(".pron").textContent === "욘／시",
+        four.querySelector(".read").textContent);
+    const zero = r3[0];
+    say("零／ゼロ 표기와 읽는 법",
+        zero.querySelector(".ja").textContent === "零／ゼロ" &&
+        zero.querySelector(".read").textContent === "れい／ぜろ" &&
+        zero.querySelector(".mean").textContent === "0",
+        zero.querySelector(".read").textContent);
+    const miss3 = c3.w.eval("ITEMS.filter(x => !x.pron).length");
+    say("3장 모든 항목에 한글 발음 있음", miss3 === 0, "빈 항목=" + miss3);
+    f3.remove();
+
+    // 3장 퀴즈·듣기도 데이터만으로 자동 동작해야 한다
+    const fq3 = await mk("chapter.html?ch=3");
+    const u3 = fq3.contentWindow.eval("new Set(ITEMS.map(x => x.ko)).size");
+    say("3장 퀴즈 11항목, 뜻 중복 없음",
+        fq3.contentWindow.eval("ITEMS.length") === 11 && u3 === 11, "uniq=" + u3);
+    fq3.remove();
+    const fl3 = await mk("listen.html?ch=3");
+    say("3장 듣기 11트랙, 零은 れい로 읽음",
+        fl3.contentDocument.querySelectorAll(".track").length === 11 &&
+        fl3.contentWindow.eval("jaText(ITEMS[0])") === "れい",
+        fl3.contentWindow.eval("jaText(ITEMS[0])"));
+    fl3.remove();
   }
 
   /* ── 12. 1장 듣기 ── */
