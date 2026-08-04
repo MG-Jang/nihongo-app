@@ -493,6 +493,82 @@ function pickChoice({ w, d }, wantCorrect) {
     fl3.remove();
   }
 
+  /* ── 11d. 테마 ── */
+  {
+    const mkT = src => new Promise(res => {
+      const f = document.createElement("iframe");
+      f.style.cssText = "width:800px;height:700px";
+      f.src = src;
+      f.onload = () => setTimeout(() => res(f), 60);
+      document.body.appendChild(f);
+    });
+
+    localStorage.removeItem("theme");
+    const f = await mkT("index.html");
+    const c = ctx(f);
+    const html = c.d.documentElement;
+    const css = el => c.w.getComputedStyle(el);
+    // 헤드리스에서는 CSS 전환이 진행되지 않아 색이 시작값에 멈춰 있다. 전환을 꺼서 최종색을 잰다.
+    const noAnim = c.d.createElement("style");
+    noAnim.textContent = "* { transition: none !important; }";
+    c.d.head.appendChild(noAnim);
+
+    // 저장값이 없으면 자동 — 시스템 설정에 따라 light/dark 중 하나로 풀린다
+    say("기본은 자동이고 구체적인 테마로 풀림",
+        ["light", "dark"].includes(html.dataset.theme) &&
+        c.d.querySelector('[data-theme-set="auto"]').getAttribute("aria-pressed") === "true",
+        html.dataset.theme);
+
+    // 블랙 테마 — 배경은 검정, 글자는 흰색, 강조색도 흰색
+    c.d.querySelector('[data-theme-set="black"]').click();
+    await sleep(40);
+    const bg = css(c.d.body).backgroundColor;
+    const fg = css(c.d.body).color;
+    say("블랙 테마 → 검정 배경 · 흰 글자",
+        html.dataset.theme === "black" &&
+        bg.startsWith("rgb(0, 0, 0") && fg === "rgb(255, 255, 255)", bg + " / " + fg);
+
+    // 선택된 칩은 흰 바탕 + 검은 글자여야 읽힌다 (흰 글자면 안 보인다)
+    const chip = c.d.querySelector('[data-theme-set="black"]');
+    say("블랙 테마에서 선택된 칩 글자가 검정", css(chip).color === "rgb(0, 0, 0)", css(chip).color);
+
+    // 목록의 뜻·발음도 색조 없이 무채색
+    const f2 = await mkT("list.html?ch=3&kind=word");
+    const c2 = ctx(f2);
+    const mean = c2.w.getComputedStyle(c2.d.querySelector(".mean")).color;
+    const pron = c2.w.getComputedStyle(c2.d.querySelector(".pron")).color;
+    const mono = s => { const [r, g, b] = s.match(/\d+/g).map(Number); return r === g && g === b; };
+    say("블랙 테마에서 뜻·발음이 무채색", mono(mean) && mono(pron), mean + " / " + pron);
+    say("테마가 다른 페이지에도 이어짐", c2.d.documentElement.dataset.theme === "black");
+    f2.remove();
+
+    // 색조를 안 쓰는 테마라도 정답/오답은 구별돼야 한다 (밝기 차이로)
+    const f3 = await mkT("chapter.html?ch=3");
+    const c3 = ctx(f3);
+    const st = c3.d.createElement("style");
+    st.textContent = "* { transition: none !important; }";
+    c3.d.head.appendChild(st);
+    const ko3 = c3.w.eval("current.ko");
+    [...c3.d.querySelectorAll(".choice")].find(b => b.dataset.ko !== ko3).click();
+    await sleep(40);
+    const ok = c3.w.getComputedStyle(c3.d.querySelector(".choice.correct"));
+    const no = c3.w.getComputedStyle(c3.d.querySelector(".choice.wrong"));
+    const lum = s => { const [r, g, b] = s.match(/\d+/g).map(Number); return .21 * r + .72 * g + .07 * b; };
+    say("블랙 테마에서도 정답/오답이 밝기로 구별됨",
+        c3.d.documentElement.dataset.theme === "black" &&
+        lum(ok.color) - lum(no.color) > 40 && ok.borderColor !== no.borderColor,
+        "정답 " + ok.color + " / 오답 " + no.color);
+    f3.remove();
+
+    // 라이트로 되돌리기
+    c.d.querySelector('[data-theme-set="light"]').click();
+    await sleep(40);
+    say("라이트 테마로 전환되고 저장됨",
+        html.dataset.theme === "light" && localStorage.getItem("theme") === "light");
+    f.remove();
+    localStorage.removeItem("theme");
+  }
+
   /* ── 12. 1장 듣기 ── */
   {
     const f = document.createElement("iframe");

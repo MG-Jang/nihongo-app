@@ -27,6 +27,14 @@
       <div class="d">히라가나 · 탁음 · 반탁음 · 요음 104자를 한글 발음으로 맞히기. 어려운 단계는 24자씩 3단계 + 최고 단계.</div>
     </a>
   </div>
+
+  <div class="theme-bar" id="theme-bar">
+    <span class="theme-label">테마</span>
+    <button class="chip" data-theme-set="auto">자동</button>
+    <button class="chip" data-theme-set="light">라이트</button>
+    <button class="chip" data-theme-set="dark">다크</button>
+    <button class="chip" data-theme-set="black">블랙</button>
+  </div>
 </div>
 
 <script src="chapters.js"></script>
@@ -45,6 +53,17 @@ for (const n of nums) {
   a.children[1].textContent = ch.items.length + "개 항목 · 퀴즈 · 듣기 · 단어/문장 목록";
   menu.appendChild(a);
 }
+
+/* 테마 고르기 — 실제 적용과 저장은 app.js가 맡고, 여기서는 버튼만 연결한다 */
+const themeBtns = [...document.querySelectorAll("[data-theme-set]")];
+function markTheme() {
+  const cur = savedTheme();
+  for (const b of themeBtns) b.setAttribute("aria-pressed", b.dataset.themeSet === cur);
+}
+for (const b of themeBtns) {
+  b.onclick = () => { setTheme(b.dataset.themeSet); markTheme(); };
+}
+markTheme();
 
 // 다음 장 자리 표시 — chapters.js에 데이터가 들어오면 자동으로 진짜 항목이 된다
 const soon = document.createElement("a");
