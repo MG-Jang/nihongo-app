@@ -8,7 +8,7 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icon-192.png">
 <meta name="theme-color" content="#6366f1">
-<script>if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js");</script>
+<script src="app.js"></script>
 </head>
 <body>
 <div class="wrap">
@@ -29,7 +29,7 @@
   </div>
 </div>
 
-<script src="chapters.js?v=6"></script>
+<script src="chapters.js"></script>
 <script>
 // 장 목록은 chapters.js에서 만들어 낸다 — 새 장을 추가하면 여기 목록도 자동으로 늘어난다
 const menu = document.getElementById("menu");

@@ -4,7 +4,7 @@
  * 오프라인일 때만 마지막으로 캐시된 사본으로 대신한다.
  * 단어를 자주 고치는 앱이라 캐시 우선으로 하면 낡은 화면이 붙어 다니게 된다.
  */
-const CACHE = "nihongo-v6";
+const CACHE = "nihongo-v7";
 const CORE = [
   "./",
   "index.html",
@@ -14,15 +14,26 @@ const CORE = [
   "listen.html",
   "list.html",
   "style.css",
-  "chapters.js?v=6",
+  "app.js",
+  "chapters.js",
   "manifest.webmanifest",
   "icon-192.png",
   "icon-512.png",
 ];
 
+/*
+ * 네트워크로 나갈 때는 브라우저 HTTP 캐시를 반드시 거쳐 검사하게 한다.
+ * GitHub Pages가 max-age=600을 주기 때문에, 그냥 fetch 하면 "네트워크 우선"이라 해도
+ * 실제로는 10분짜리 낡은 사본을 받아 그대로 캐시에 덮어쓰게 된다.
+ * no-cache 는 매번 서버에 물어보되 안 바뀌었으면 304만 받아 오므로 낭비도 적다.
+ */
+const fresh = req => fetch(req, { cache: "no-cache" });
+
 self.addEventListener("install", e => {
   e.waitUntil(
-    caches.open(CACHE).then(c => c.addAll(CORE)).then(() => self.skipWaiting())
+    caches.open(CACHE)
+      .then(c => Promise.all(CORE.map(u => fresh(u).then(r => c.put(u, r)))))
+      .then(() => self.skipWaiting())
   );
 });
 
@@ -39,7 +50,7 @@ self.addEventListener("fetch", e => {
   if (req.method !== "GET" || new URL(req.url).origin !== location.origin) return;
 
   e.respondWith(
-    fetch(req)
+    fresh(req)
       .then(res => {
         const copy = res.clone();
         caches.open(CACHE).then(c => c.put(req, copy));
