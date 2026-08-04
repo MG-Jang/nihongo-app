@@ -374,28 +374,29 @@ function pickChoice({ w, d }, wantCorrect) {
     const rows = [...cw.d.querySelectorAll(".item")];
     say("1장 단어 목록 22개 (문장 2개 제외)", rows.length === 22, "n=" + rows.length);
 
-    // 첫 항목(会社員)이 일본어 → 읽는 법 → (뜻 + 한글 발음) 순서로 표시되는지
+    // 읽는 법이 윗줄, 표기·뜻·발음이 아랫줄 한 줄에 놓이는지
     const cols = [...rows[0].querySelector(".col").children].map(x => x.className);
-    const txt = ["ja", "read", "mean", "pron"].map(c => rows[0].querySelector("." + c).textContent);
-    say("표시 순서: 일본어 · 읽는 법 · (뜻+발음 한 줄)",
-        cols.join(",") === "ja jp,read jp,kr" &&
-        txt.join("|") === "会社員|かいしゃいん|회사원|카이샤인", cols.join(",") + " / " + txt.join("|"));
+    const txt = ["read", "ja", "mean", "pron"].map(c => rows[0].querySelector("." + c).textContent);
+    say("표시 순서: 읽는 법 / (표기+뜻+발음 한 줄)",
+        cols.join(",") === "read jp,row" &&
+        txt.join("|") === "かいしゃいん|会社員|회사원|카이샤인", cols.join(",") + " / " + txt.join("|"));
 
-    // 뜻과 발음이 실제로 같은 줄에 놓였는지 (세로 위치가 같아야 한다)
-    const mBox = rows[0].querySelector(".mean").getBoundingClientRect();
-    const pBox = rows[0].querySelector(".pron").getBoundingClientRect();
-    say("뜻과 한글 발음이 한 줄에 나란히",
-        Math.abs(mBox.top - pBox.top) < 6 && pBox.left > mBox.right - 2,
-        "mean.top=" + Math.round(mBox.top) + " pron.top=" + Math.round(pBox.top));
+    const box = c => rows[0].querySelector("." + c).getBoundingClientRect();
+    say("읽는 법이 한자 바로 위 (왼쪽 끝이 맞음)",
+        box("read").bottom <= box("ja").top + 2 && Math.abs(box("read").left - box("ja").left) < 2,
+        "read.left=" + Math.round(box("read").left) + " ja.left=" + Math.round(box("ja").left));
+    say("표기·뜻·발음이 한 줄에 나란히",
+        Math.abs(box("ja").bottom - box("mean").bottom) < 6 &&
+        box("mean").left > box("ja").right - 2 && box("pron").left > box("mean").right - 2);
 
-    // 가나만으로 된 단어는 읽는 법 줄을 비워 중복 표시를 피한다
+    // 한자가 없는 항목은 읽을 것이 없으므로 "-"
     const ana = rows.find(r => r.querySelector(".ja").textContent === "あなた");
-    say("가나 단어는 읽는 법 줄 생략", ana.querySelector(".read").textContent === "");
+    say("한자 없는 단어는 읽는 법 자리에 -", ana.querySelector(".read").textContent === "-");
 
-    // 조사는 ～ 를 떼고 읽는 법을 보여준다
+    // 조사도 한자가 없으므로 "-" 이고, 발음은 한글 발음 자리에서 알려준다
     const wa = rows.find(r => r.querySelector(".ja").textContent === "～は");
-    say("조사 ～は → 읽는 법 は, 한글 발음 와",
-        wa.querySelector(".read").textContent === "は" && wa.querySelector(".pron").textContent === "와");
+    say("조사 ～は → 읽는 법 -, 한글 발음 와",
+        wa.querySelector(".read").textContent === "-" && wa.querySelector(".pron").textContent === "와");
 
     // 모든 항목에 한글 발음이 채워져 있어야 한다
     const missing = cw.w.eval("ITEMS.filter(x => !x.pron).length");
@@ -449,6 +450,11 @@ function pickChoice({ w, d }, wantCorrect) {
         zero.querySelector(".read").textContent.startsWith("れい／ぜろ") &&
         zero.querySelector(".mean").textContent === "0",
         zero.querySelector(".read").textContent);
+
+    // 3장의 한자 없는 항목들도 "-" 로 표시되는지
+    const dash = ["ここ", "アルバイト", "～から", "～まで"].map(k =>
+      r3.find(r => r.querySelector(".ja").textContent === k).querySelector(".read").textContent);
+    say("3장의 한자 없는 항목(ここ·アルバイト·조사)은 -", dash.every(d => d === "-"), dash.join(" "));
     const miss3 = c3.w.eval("ITEMS.filter(x => !x.pron).length");
     say("3장 모든 항목에 한글 발음 있음", miss3 === 0, "빈 항목=" + miss3);
     f3.remove();
