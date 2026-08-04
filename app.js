@@ -27,7 +27,7 @@ function applyTheme(name) {
 
   // 주소창·상태바 색도 테마를 따라가게 한다
   const meta = document.querySelector('meta[name="theme-color"]');
-  if (meta) meta.content = { light: "#6366f1", dark: "#0c0f1d", black: "#000000" }[resolved];
+  if (meta) meta.content = { light: "#6366f1", dark: "#191c26", black: "#000000" }[resolved];
 }
 
 function setTheme(name) {

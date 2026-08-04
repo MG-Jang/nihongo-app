@@ -33,29 +33,30 @@
 }
 
 [data-theme="dark"] {
-  --bg: #0c0f1d;
-  --glow1: rgba(99, 102, 241, .22);
-  --glow2: rgba(168, 85, 247, .16);
-  --card: #161a2c;
-  --card-2: #1b2036;
+  /* 새까맣지 않은 회색 계열. 카드를 배경보다 한 단계 밝게 두어 층이 보이게 한다. */
+  --bg: #191c26;
+  --glow1: rgba(99, 102, 241, .18);
+  --glow2: rgba(168, 85, 247, .13);
+  --card: #242833;
+  --card-2: #2c3140;
   --text: #e9ebf5;
-  --muted: #98a0b6;
-  --border: #2a3050;
-  --accent: #7c82f8;
+  --muted: #a3aabf;
+  --border: #3a4055;
+  --accent: #8a90fa;
   --accent-2: #c084fc;
   --on-accent: #ffffff;
-  --grad: linear-gradient(135deg, #7c82f8, #c084fc);
+  --grad: linear-gradient(135deg, #8a90fa, #c084fc);
   /* 뜻·발음은 오래 들여다보는 글자라 채도를 낮춰 둔다 (형광빛으로 눈이 피로해지지 않게) */
   --mean: #9ecfc7;
   --pron: #aab0f0;
-  --ok: #3ddc97;
-  --ok-bg: #10281f;
-  --no: #f87171;
-  --no-bg: #2b1518;
+  --ok: #4ee3a2;
+  --ok-bg: #1b3329;
+  --no: #fb8585;
+  --no-bg: #3a2126;
   --warn: #fbbf24;
-  --warn-bg: #2b2210;
-  --shadow: 0 1px 2px rgba(0, 0, 0, .35), 0 12px 34px rgba(0, 0, 0, .45);
-  --shadow-accent: 0 4px 16px rgba(124, 130, 248, .35);
+  --warn-bg: #382d18;
+  --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 12px 30px rgba(0, 0, 0, .35);
+  --shadow-accent: 0 4px 16px rgba(138, 144, 250, .3);
 }
 
 /* 블랙 — 검정 바탕에 흰 글자만. 색조를 아예 쓰지 않고 밝기 차이로만 구분한다. */
