@@ -52,8 +52,15 @@ if (!chapter) {
 document.title = chapter.title + " · " + chapter.subtitle;
 document.getElementById("title").textContent = chapter.title + " · " + chapter.subtitle;
 const nSentence = chapter.items.filter(it => it.kind === "s").length;
+const nRef = chapter.items.filter(it => it.quiz === false).length;
 document.getElementById("lede").textContent =
   "단어 " + (chapter.items.length - nSentence) + "개 · 문장 " + nSentence + "개. 퀴즈로 외우거나 듣기로 반복하세요.";
+
+// 읽기표는 퀴즈에서 빠지므로, 개수가 달라 보이는 이유를 미리 알려 준다
+if (nRef) {
+  const d = document.getElementById("go-quiz").children[1];
+  d.textContent += " 시간·숫자 읽기표 " + nRef + "개는 목록·듣기에만 있고 퀴즈에서는 빠집니다.";
+}
 document.getElementById("go-quiz").href = "chapter.html?ch=" + chNo;
 document.getElementById("go-listen").href = "listen.html?ch=" + chNo;
 document.getElementById("go-words").href = "list.html?ch=" + chNo + "&kind=word";
