@@ -318,9 +318,8 @@ function pickChoice({ w, d }, wantCorrect) {
     const links = [...fi.contentDocument.querySelectorAll("#menu .entry")].map(a => a.getAttribute("href"));
     const soonT = fi.contentDocument.querySelector(".entry.soon .t").textContent;
     say("목록에 장 항목이 chapters.js에서 자동 생성",
-        links.includes("ch.html?ch=1") && links.includes("ch.html?ch=2") &&
-        links.includes("ch.html?ch=3"), links.join(" "));
-    say("다음 장 자리 표시(4장)", soonT === "4장", soonT);
+        [1, 2, 3, 4].every(n => links.includes("ch.html?ch=" + n)), links.join(" "));
+    say("다음 장 자리 표시(5장)", soonT === "5장", soonT);
     fi.remove();
 
     // 2장 — 보기 중복 여부 (뜻이 겹치면 5지선다 정답이 둘이 된다).
@@ -491,6 +490,41 @@ function pickChoice({ w, d }, wantCorrect) {
     say("듣기는 읽기표까지 전부 읽어줌", t3 === all3 && t3 > q3, "트랙 " + t3 + "개");
     say("零은 れい로 읽음", fl3.contentWindow.eval("jaText(ITEMS[0])") === "れい");
     fl3.remove();
+
+    /* ── 4장 (い형용사) ── */
+    const f4 = await mk("list.html?ch=4&kind=word");
+    const c4 = ctx(f4);
+    const r4 = [...c4.d.querySelectorAll(".item")];
+    const ja4 = r4.map(x => x.querySelector(".ja").textContent);
+    say("4장 단어 목록에 형용사·명사·활용표가 모두 있음",
+        ["遠い", "難しい", "いい", "学校", "～が", "高くありません"].every(k => ja4.includes(k)),
+        "n=" + r4.length);
+
+    const read4 = k => r4.find(x => x.querySelector(".ja").textContent === k).querySelector(".read").textContent;
+    say("형용사 후리가나는 어간에만 (遠い→とおい, 難しい→むずかしい)",
+        read4("遠い") === "とおい" && read4("難しい") === "むずかしい",
+        read4("遠い") + " " + read4("難しい"));
+    say("가나로만 된 형용사(いい·おいしい)는 -", read4("いい") === "-" && read4("おいしい") === "-");
+    say("4장 모든 항목에 한글 발음 있음",
+        c4.w.eval("ITEMS.filter(x => !x.pron).length") === 0);
+    f4.remove();
+
+    const fq4 = await mk("chapter.html?ch=4");
+    const w4 = fq4.contentWindow;
+    const all4 = w4.eval("CHAPTERS['4'].items.length");
+    const ref4 = w4.eval("CHAPTERS['4'].items.filter(x => x.quiz === false).length");
+    say("4장 퀴즈는 활용표를 빼고 출제, 뜻 중복 없음",
+        w4.eval("ITEMS.length") === all4 - ref4 && ref4 === 5 &&
+        w4.eval("new Set(ITEMS.map(x => x.ko)).size") === w4.eval("ITEMS.length"),
+        "전체 " + all4 + " - 활용표 " + ref4 + " = " + w4.eval("ITEMS.length"));
+    fq4.remove();
+
+    const fs4 = await mk("list.html?ch=4&kind=sentence");
+    const s4 = [...fs4.contentDocument.querySelectorAll(".item .ja")].map(x => x.textContent);
+    say("4장 문장 목록에 회화문이 들어감",
+        s4.includes("学校はうちから遠いですか。") &&
+        s4.includes("少し難しいですが、おもしろいです。"), "n=" + s4.length);
+    fs4.remove();
   }
 
   /* ── 11d. 테마 ── */
