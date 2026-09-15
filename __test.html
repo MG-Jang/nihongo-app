@@ -318,8 +318,8 @@ function pickChoice({ w, d }, wantCorrect) {
     const links = [...fi.contentDocument.querySelectorAll("#menu .entry")].map(a => a.getAttribute("href"));
     const soonT = fi.contentDocument.querySelector(".entry.soon .t").textContent;
     say("목록에 장 항목이 chapters.js에서 자동 생성",
-        [1, 2, 3, 4].every(n => links.includes("ch.html?ch=" + n)), links.join(" "));
-    say("다음 장 자리 표시(5장)", soonT === "5장", soonT);
+        [1, 2, 3, 4, 5].every(n => links.includes("ch.html?ch=" + n)), links.join(" "));
+    say("다음 장 자리 표시(6장)", soonT === "6장", soonT);
     fi.remove();
 
     // 2장 — 보기 중복 여부 (뜻이 겹치면 5지선다 정답이 둘이 된다).
@@ -525,6 +525,38 @@ function pickChoice({ w, d }, wantCorrect) {
         s4.includes("学校はうちから遠いですか。") &&
         s4.includes("少し難しいですが、おもしろいです。"), "n=" + s4.length);
     fs4.remove();
+
+    /* ── 5장 (い형용사의 명사 수식 · ～くて) ── */
+    const f5 = await mk("list.html?ch=5&kind=word");
+    const c5 = ctx(f5);
+    const r5 = [...c5.d.querySelectorAll(".item")];
+    const ja5 = r5.map(x => x.querySelector(".ja").textContent);
+    say("5장 단어 목록에 형용사·지시어·연결형이 모두 있음",
+        ["白い", "軽い", "この", "どんな", "軽くて", "よくて"].every(k => ja5.includes(k)),
+        "n=" + r5.length);
+    const read5 = k => r5.find(x => x.querySelector(".ja").textContent === k).querySelector(".read").textContent;
+    say("明るい는 어간만 후리가나 (あかるい)", read5("明るい") === "あかるい", read5("明るい"));
+    say("지시어 この·どんな는 한자가 없어 -",
+        read5("この") === "-" && read5("どんな") === "-");
+    say("5장 모든 항목에 한글 발음 있음", c5.w.eval("ITEMS.filter(x => !x.pron).length") === 0);
+    f5.remove();
+
+    const fq5 = await mk("chapter.html?ch=5");
+    const w5 = fq5.contentWindow;
+    const all5 = w5.eval("CHAPTERS['5'].items.length");
+    const ref5 = w5.eval("CHAPTERS['5'].items.filter(x => x.quiz === false).length");
+    say("5장 퀴즈는 연결형 표를 빼고 출제, 뜻 중복 없음",
+        w5.eval("ITEMS.length") === all5 - ref5 && ref5 === 4 &&
+        w5.eval("new Set(ITEMS.map(x => x.ko)).size") === w5.eval("ITEMS.length"),
+        "전체 " + all5 + " - 표 " + ref5 + " = " + w5.eval("ITEMS.length"));
+    fq5.remove();
+
+    const fs5 = await mk("list.html?ch=5&kind=sentence");
+    const s5 = [...fs5.contentDocument.querySelectorAll(".item .ja")].map(x => x.textContent);
+    say("5장 문장 목록에 회화문이 들어감",
+        s5.includes("この白いケータイはキムさんのですか。") &&
+        s5.includes("広くて明るい部屋です。"), "n=" + s5.length);
+    fs5.remove();
   }
 
   /* ── 11d. 테마 ── */
