@@ -318,8 +318,8 @@ function pickChoice({ w, d }, wantCorrect) {
     const links = [...fi.contentDocument.querySelectorAll("#menu .entry")].map(a => a.getAttribute("href"));
     const soonT = fi.contentDocument.querySelector(".entry.soon .t").textContent;
     say("목록에 장 항목이 chapters.js에서 자동 생성",
-        [1, 2, 3, 4, 5].every(n => links.includes("ch.html?ch=" + n)), links.join(" "));
-    say("다음 장 자리 표시(6장)", soonT === "6장", soonT);
+        [1, 2, 3, 4, 5, 6, 7].every(n => links.includes("ch.html?ch=" + n)), links.join(" "));
+    say("다음 장 자리 표시(8장)", soonT === "8장", soonT);
     fi.remove();
 
     // 2장 — 보기 중복 여부 (뜻이 겹치면 5지선다 정답이 둘이 된다).
@@ -557,6 +557,50 @@ function pickChoice({ w, d }, wantCorrect) {
         s5.includes("この白いケータイはキムさんのですか。") &&
         s5.includes("広くて明るい部屋です。"), "n=" + s5.length);
     fs5.remove();
+
+    /* ── 6·7장 (な형용사) ── */
+    const f6 = await mk("list.html?ch=6&kind=word");
+    const c6 = ctx(f6);
+    const r6 = [...c6.d.querySelectorAll(".item")];
+    const ja6 = r6.map(x => x.querySelector(".ja").textContent);
+    say("6장 단어 목록에 な형용사·부사·활용표가 모두 있음",
+        ["好きだ", "上手だ", "賑やかだ", "あまり", "賑やかじゃありません"].every(k => ja6.includes(k)),
+        "n=" + r6.length);
+    const read6 = k => r6.find(x => x.querySelector(".ja").textContent === k).querySelector(".read").textContent;
+    say("な형용사 후리가나는 어간에만 (好きだ→すきだ, 上手だ→じょうずだ)",
+        read6("好きだ") === "すきだ" && read6("上手だ") === "じょうずだ",
+        read6("好きだ") + " " + read6("上手だ"));
+    say("6장 모든 항목에 한글 발음 있음", c6.w.eval("ITEMS.filter(x => !x.pron).length") === 0);
+    f6.remove();
+
+    const f7 = await mk("list.html?ch=7&kind=word");
+    const c7 = ctx(f7);
+    const r7 = [...c7.d.querySelectorAll(".item")];
+    const ja7 = r7.map(x => x.querySelector(".ja").textContent);
+    say("7장 단어 목록에 명사 수식·연결·이유 표가 모두 있음",
+        ["静かな人", "新鮮で", "辛いから", "有名だから", "～から"].every(k => ja7.includes(k)),
+        "n=" + r7.length);
+    say("7장 모든 항목에 한글 발음 있음", c7.w.eval("ITEMS.filter(x => !x.pron).length") === 0);
+    f7.remove();
+
+    for (const [n, ref] of [["6", 4], ["7", 4]]) {
+      const fq = await mk("chapter.html?ch=" + n);
+      const w = fq.contentWindow;
+      const all = w.eval("CHAPTERS['" + n + "'].items.length");
+      const r = w.eval("CHAPTERS['" + n + "'].items.filter(x => x.quiz === false).length");
+      say(n + "장 퀴즈는 활용표를 빼고 출제, 뜻 중복 없음",
+          w.eval("ITEMS.length") === all - r && r === ref &&
+          w.eval("new Set(ITEMS.map(x => x.ko)).size") === w.eval("ITEMS.length"),
+          "전체 " + all + " - 표 " + r + " = " + w.eval("ITEMS.length"));
+      fq.remove();
+    }
+
+    const fs67 = await mk("list.html?ch=7&kind=sentence");
+    const s67 = [...fs67.contentDocument.querySelectorAll(".item .ja")].map(x => x.textContent);
+    say("7장 문장 목록에 회화문이 들어감",
+        s67.includes("きれいなレストランですね。") && s67.includes("辛いからです。"),
+        "n=" + s67.length);
+    fs67.remove();
   }
 
   /* ── 11d. 테마 ── */
